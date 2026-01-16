@@ -2,7 +2,7 @@ import mqtt from "mqtt";
 import { Pool } from "pg";
 
 const MQTT_URL = process.env.MQTT_URL ?? "mqtt://127.0.0.1:1883";
-const TOPIC = process.env.MQTT_TOPIC ?? "iot/+/telemetry";
+const TOPIC = process.env.MQTT_TOPIC ?? "iot/shrek-esp32/telemetry";
 
 const pool = new Pool({
   host: process.env.PGHOST ?? "127.0.0.1",
@@ -24,11 +24,16 @@ client.on("connect", () => {
 });
 
 client.on("message", async (topic, payload) => {
-  // topic: iot/<device_id>/telemetry
-  const parts = topic.split("/");
-  const deviceId = parts[1];
+    const parts = topic.split("/");
+    const deviceId = parts[1];
 
-  const msg = JSON.parse(payload.toString("utf-8"));
+    let msg;
+    try {
+      msg = JSON.parse(payload.toString("utf-8"));
+    } catch (err) {
+      console.warn("Invalid JSON:", payload.toString());
+      return;
+    }
   // expects: { t, h, lux, sound, co2 }
 
   await pool.query(

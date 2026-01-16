@@ -1,0 +1,15 @@
+node_modules/
+npm-debug.log*
+dist/
+
+.env
+.env.*
+
+infra/postgres/data/
+infra/mosquitto/data/
+infra/mysql/data/
+
+*.log
+
+.DS_Store
+Thumbs.db

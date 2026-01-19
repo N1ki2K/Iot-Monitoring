@@ -1,11 +1,41 @@
 import axios from 'axios';
-import type { Reading, PaginatedResponse } from '../types';
+import type {
+  Reading,
+  PaginatedResponse,
+  AuthUser,
+  UserListItem,
+  UserControllerAssignment,
+  Controller,
+} from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const client = axios.create({
   baseURL: API_URL,
   timeout: 10000,
+});
+
+const getStoredUserId = () => {
+  if (typeof window === 'undefined') return null;
+  const stored = localStorage.getItem('authUser');
+  if (!stored) return null;
+  try {
+    const parsed = JSON.parse(stored) as AuthUser;
+    return parsed.id ?? null;
+  } catch {
+    return null;
+  }
+};
+
+client.interceptors.request.use((config) => {
+  const userId = getStoredUserId();
+  if (userId) {
+    config.headers = config.headers ?? {};
+    if (!config.headers['x-user-id']) {
+      config.headers['x-user-id'] = userId;
+    }
+  }
+  return config;
 });
 
 export const api = {
@@ -49,6 +79,100 @@ export const api = {
       },
     });
     return data;
+  },
+
+  register: async (payload: {
+    username: string;
+    email: string;
+    password: string;
+  }): Promise<AuthUser> => {
+    const { data } = await client.post<AuthUser>('/auth/register', payload);
+    return data;
+  },
+
+  login: async (payload: { email: string; password: string }): Promise<AuthUser> => {
+    const { data } = await client.post<AuthUser>('/auth/login', payload);
+    return data;
+  },
+
+  getUsers: async (): Promise<UserListItem[]> => {
+    const { data } = await client.get<UserListItem[]>('/users');
+    return data;
+  },
+
+  getUserControllers: async (userId: number): Promise<UserControllerAssignment[]> => {
+    const { data } = await client.get<UserControllerAssignment[]>(`/users/${userId}/controllers`, {
+      headers: {
+        'x-user-id': userId,
+      },
+    });
+    return data;
+  },
+
+  assignUserController: async (userId: number, controllerId: number) => {
+    const { data } = await client.post<UserControllerAssignment | null>(
+      `/users/${userId}/controllers`,
+      { controllerId }
+    );
+    return data;
+  },
+
+  removeUserController: async (userId: number, controllerId: number) => {
+    await client.delete(`/users/${userId}/controllers`, {
+      data: { controllerId },
+    });
+  },
+
+  updateUserControllerLabel: async (userId: number, controllerId: number, label?: string) => {
+    const { data } = await client.patch(`/users/${userId}/controllers/${controllerId}`, {
+      label,
+    });
+    return data;
+  },
+
+  getControllers: async (): Promise<Controller[]> => {
+    const { data } = await client.get<Controller[]>('/controllers');
+    return data;
+  },
+
+  getAvailableDevices: async (): Promise<string[]> => {
+    const { data } = await client.get<string[]>('/controllers/available-devices');
+    return data;
+  },
+
+  createController: async (payload: { deviceId: string; label?: string }) => {
+    const { data } = await client.post<Controller>('/controllers', payload);
+    return data;
+  },
+
+  deleteController: async (controllerId: number) => {
+    await client.delete(`/controllers/${controllerId}`);
+  },
+
+  claimController: async (code: string, label?: string): Promise<Controller> => {
+    const { data } = await client.post<{ controller: Controller }>('/controllers/claim', {
+      code,
+      label,
+    });
+    return data.controller;
+  },
+
+  getMe: async (): Promise<AuthUser> => {
+    const { data } = await client.get<AuthUser>('/me');
+    return data;
+  },
+
+  updateMe: async (payload: { username: string; email: string }): Promise<AuthUser> => {
+    const { data } = await client.patch<AuthUser>('/me', payload);
+    return data;
+  },
+
+  updatePassword: async (payload: { currentPassword: string; newPassword: string }) => {
+    await client.patch('/me/password', payload);
+  },
+
+  deleteMe: async () => {
+    await client.delete('/me');
   },
 };
 

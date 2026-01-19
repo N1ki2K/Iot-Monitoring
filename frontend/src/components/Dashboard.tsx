@@ -1,13 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Activity, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
+import { RefreshCw, Plus } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { Reading } from '../types';
+import type { Reading, AuthUser } from '../types';
+import { ProfileMenu } from './ProfileMenu';
 import SensorCard from './SensorCard';
 import Chart from './Chart';
 import DataTable from './DataTable';
 import DeviceSelector from './DeviceSelector';
 
-export function Dashboard() {
+interface DashboardProps {
+  user?: AuthUser | null;
+  onLogout: () => void;
+}
+
+export function Dashboard({ user, onLogout }: DashboardProps) {
+  const navigate = useNavigate();
   const [devices, setDevices] = useState<string[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>('');
   const [latestReading, setLatestReading] = useState<Reading | null>(null);
@@ -15,24 +23,59 @@ export function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [claimCode, setClaimCode] = useState('');
+  const [claimLabel, setClaimLabel] = useState('');
+  const [claimError, setClaimError] = useState('');
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [deviceOptions, setDeviceOptions] = useState<Array<{ id: string; label?: string | null }>>(
+    []
+  );
 
   // Load devices on mount
-  useEffect(() => {
-    const loadDevices = async () => {
-      try {
-        const deviceList = await api.getDevices();
-        setDevices(deviceList);
-        if (deviceList.length > 0 && !selectedDevice) {
-          setSelectedDevice(deviceList[0]);
+  const loadDevices = useCallback(async () => {
+    try {
+      if (user && user.is_admin !== 1) {
+        const assignments = await api.getUserControllers(user.id);
+        const options = assignments.map((assignment) => ({
+          id: assignment.device_id,
+          label: assignment.assignment_label || assignment.controller_label,
+        }));
+        setDeviceOptions(options);
+        setDevices(options.map((option) => option.id));
+        if (options.length > 0 && !selectedDevice) {
+          setSelectedDevice(options[0].id);
         }
-      } catch (error) {
-        console.error('Failed to load devices:', error);
-      } finally {
-        setIsLoading(false);
+        return;
       }
-    };
+
+      const deviceList = await api.getDevices();
+      setDevices(deviceList);
+      setDeviceOptions(deviceList.map((device) => ({ id: device })));
+      if (deviceList.length > 0 && !selectedDevice) {
+        setSelectedDevice(deviceList[0]);
+      }
+    } catch (error) {
+      console.error('Failed to load devices:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedDevice, user]);
+
+  useEffect(() => {
     loadDevices();
-  }, []);
+  }, [loadDevices]);
+
+  useEffect(() => {
+    if (deviceOptions.length === 0) {
+      setSelectedDevice('');
+      return;
+    }
+    const hasSelected = deviceOptions.some((option) => option.id === selectedDevice);
+    if (!hasSelected) {
+      setSelectedDevice(deviceOptions[0].id);
+    }
+  }, [deviceOptions, selectedDevice]);
 
   // Fetch data for selected device
   const fetchDeviceData = useCallback(async () => {
@@ -67,6 +110,29 @@ export function Dashboard() {
     fetchDeviceData();
   };
 
+  const handleClaim = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setClaimError('');
+    const normalizedCode = claimCode.trim();
+    if (!/^\d{5}$/.test(normalizedCode)) {
+      setClaimError('Enter your 5-digit code.');
+      return;
+    }
+    setIsClaiming(true);
+    try {
+      await api.claimController(normalizedCode, claimLabel.trim() || undefined);
+      setClaimCode('');
+      setClaimLabel('');
+      setShowClaimModal(false);
+      await loadDevices();
+    } catch (error: any) {
+      const message = error?.response?.data?.error || 'Failed to claim controller.';
+      setClaimError(message);
+    } finally {
+      setIsClaiming(false);
+    }
+  };
+
   return (
     <div className="min-h-screen p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -74,8 +140,8 @@ export function Dashboard() {
         <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/25">
-                <Activity className="w-5 h-5 text-white" />
+              <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900/80 border border-slate-700/60 shadow-lg shadow-cyan-500/10">
+                <img src="/IotMonitoring.png" alt="IoT Monitoring" className="w-12 h-12 object-contain" />
               </div>
               <h1 className="text-2xl lg:text-3xl font-bold text-white">
                 IoT Monitoring
@@ -87,12 +153,47 @@ export function Dashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            <DeviceSelector
-              devices={devices}
-              selectedDevice={selectedDevice}
-              onSelect={setSelectedDevice}
-              isLoading={isLoading}
-            />
+            {user?.is_admin === 1 && (
+              <nav className="flex items-center gap-1 rounded-full bg-slate-800/70 p-1">
+                <NavLink
+                  to="/"
+                  className={({ isActive }) =>
+                    `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                      isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
+                    }`
+                  }
+                  end
+                >
+                  Dashboard
+                </NavLink>
+                <NavLink
+                  to="/admin"
+                  className={({ isActive }) =>
+                    `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                      isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
+                    }`
+                  }
+                >
+                  Admin Dashboard
+                </NavLink>
+              </nav>
+            )}
+            {user?.is_admin !== 1 && deviceOptions.length === 0 ? (
+              <button
+                onClick={() => setShowClaimModal(true)}
+                className="btn btn-secondary flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Device</span>
+              </button>
+            ) : (
+              <DeviceSelector
+                devices={deviceOptions}
+                selectedDevice={selectedDevice}
+                onSelect={setSelectedDevice}
+                isLoading={isLoading}
+              />
+            )}
 
             <button
               onClick={handleRefresh}
@@ -102,6 +203,13 @@ export function Dashboard() {
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
+            {user && (
+              <ProfileMenu
+                user={user}
+                onLogout={onLogout}
+                onSettings={() => navigate('/settings')}
+              />
+            )}
           </div>
         </header>
 
@@ -199,6 +307,69 @@ export function Dashboard() {
           <p>ESP32 IoT Monitoring System • Real-time sensor data</p>
         </footer>
       </div>
+
+      {showClaimModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800/80 bg-slate-900/90 p-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Claim controller</h3>
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  setShowClaimModal(false);
+                  setClaimError('');
+                  setClaimCode('');
+                  setClaimLabel('');
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <form className="mt-6 space-y-4" onSubmit={handleClaim}>
+              <div>
+                <label className="text-sm text-gray-300">Pairing code</label>
+                <input
+                  className="input mt-2"
+                  placeholder="5-digit code"
+                  value={claimCode}
+                  onChange={(event) => setClaimCode(event.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-300">Device label (optional)</label>
+                <input
+                  className="input mt-2"
+                  placeholder="My office sensor"
+                  value={claimLabel}
+                  onChange={(event) => setClaimLabel(event.target.value)}
+                />
+              </div>
+              {claimError && (
+                <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+                  {claimError}
+                </div>
+              )}
+              <div className="flex items-center gap-3 justify-end">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setShowClaimModal(false);
+                    setClaimError('');
+                    setClaimCode('');
+                    setClaimLabel('');
+                  }}
+                >
+                  Cancel
+                </button>
+                <button className="btn btn-primary" type="submit" disabled={isClaiming}>
+                  {isClaiming ? 'Claiming...' : 'Claim device'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,10 +1,80 @@
-import { useState } from 'react';
-import { Lock, Mail, User, Shield, ArrowRight } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { Shield, ArrowRight } from 'lucide-react';
+import { api } from '../api';
+import type { AuthUser } from '../types';
 
 type AuthMode = 'login' | 'register';
 
-export function Auth() {
+interface AuthProps {
+  onAuth: (user: AuthUser) => void;
+}
+
+export function Auth({ onAuth }: AuthProps) {
   const [mode, setMode] = useState<AuthMode>('login');
+  const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  const resetStatus = () => {
+    setError('');
+    setUser(null);
+  };
+
+  const handleModeChange = (nextMode: AuthMode) => {
+    setMode(nextMode);
+    setPassword('');
+    setConfirmPassword('');
+    resetStatus();
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+    resetStatus();
+
+    try {
+      if (mode === 'register') {
+        if (!username || !email || !password) {
+          setError('Please fill in all required fields.');
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError('Passwords do not match.');
+          return;
+        }
+        const created = await api.register({
+          username,
+          email,
+          password,
+        });
+        setUser(created);
+        onAuth(created);
+      } else {
+        if (!email || !password) {
+          setError('Please enter your email and password.');
+          return;
+        }
+        const loggedIn = await api.login({
+          email,
+          password,
+        });
+        setUser(loggedIn);
+        onAuth(loggedIn);
+      }
+    } catch (err: any) {
+      const message = err?.response?.data?.error || 'Something went wrong. Please try again.';
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -57,7 +127,7 @@ export function Auth() {
                   className={`px-3 py-1.5 rounded-full font-semibold ${
                     mode === 'login' ? 'bg-cyan-500 text-white' : 'text-gray-400'
                   }`}
-                  onClick={() => setMode('login')}
+                  onClick={() => handleModeChange('login')}
                 >
                   Login
                 </button>
@@ -65,20 +135,38 @@ export function Auth() {
                   className={`px-3 py-1.5 rounded-full font-semibold ${
                     mode === 'register' ? 'bg-cyan-500 text-white' : 'text-gray-400'
                   }`}
-                  onClick={() => setMode('register')}
+                  onClick={() => handleModeChange('register')}
                 >
                   Register
                 </button>
               </div>
             </div>
 
-            <form className="mt-8 space-y-5">
+            <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
               {mode === 'register' && (
                 <div>
                   <label className="text-sm text-gray-300">Full name</label>
                   <div className="relative mt-2">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input className="input pl-10" placeholder="Ada Lovelace" />
+                    <input
+                      className="input"
+                      placeholder="Ada Lovelace"
+                      value={fullName}
+                      onChange={(event) => setFullName(event.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {mode === 'register' && (
+                <div>
+                  <label className="text-sm text-gray-300">Username</label>
+                  <div className="relative mt-2">
+                    <input
+                      className="input"
+                      placeholder="smart-home-admin"
+                      value={username}
+                      onChange={(event) => setUsername(event.target.value)}
+                    />
                   </div>
                 </div>
               )}
@@ -86,16 +174,32 @@ export function Auth() {
               <div>
                 <label className="text-sm text-gray-300">Email</label>
                 <div className="relative mt-2">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                  <input className="input pl-10" placeholder="you@domain.com" />
+                  <input
+                    className="input"
+                    placeholder="you@domain.com"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                  />
                 </div>
               </div>
 
               <div>
                 <label className="text-sm text-gray-300">Password</label>
                 <div className="relative mt-2">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                  <input className="input pl-10" type="password" placeholder="••••••••" />
+                  <input
+                    className="input"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-200"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
                 </div>
               </div>
 
@@ -103,8 +207,20 @@ export function Auth() {
                 <div>
                   <label className="text-sm text-gray-300">Confirm password</label>
                   <div className="relative mt-2">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input className="input pl-10" type="password" placeholder="••••••••" />
+                    <input
+                      className="input"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(event) => setConfirmPassword(event.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-200"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    >
+                      {showConfirmPassword ? 'Hide' : 'Show'}
+                    </button>
                   </div>
                 </div>
               )}
@@ -119,10 +235,31 @@ export function Auth() {
                 </button>
               </div>
 
-              <button className="btn btn-primary w-full flex items-center justify-center gap-2">
-                {mode === 'login' ? 'Sign in' : 'Create account'}
+              <button
+                className="btn btn-primary w-full flex items-center justify-center gap-2"
+                disabled={isSubmitting}
+              >
+                {isSubmitting
+                  ? 'Submitting...'
+                  : mode === 'login'
+                    ? 'Sign in'
+                    : 'Create account'}
                 <ArrowRight className="w-4 h-4" />
               </button>
+
+              {error && (
+                <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+                  {error}
+                </div>
+              )}
+
+              {user && (
+                <div className="text-sm text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
+                  {mode === 'login'
+                    ? `Welcome back, ${user.username}.`
+                    : `Account created for ${user.username}.`}
+                </div>
+              )}
 
               <p className="text-xs text-gray-500">
                 By continuing, you agree to the platform terms and data processing policy.

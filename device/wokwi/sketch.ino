@@ -7,7 +7,7 @@
 
 #define PIN_LUX   34
 #define PIN_SOUND 35
-#define PIN_AIR   32
+#define PIN_AIR   32  
 
 const char* WIFI_SSID = "Wokwi-GUEST";
 const char* WIFI_PASS = "";
@@ -15,7 +15,7 @@ const char* WIFI_PASS = "";
 const char* MQTT_HOST = "broker.hivemq.com";
 const int   MQTT_PORT = 1883;
 
-const char* TOPIC_TELE = "iot/room1/telemetry";
+const char* TOPIC_TELE = "iot/shrek-esp32/telemetry";
 
 WiFiClient wifiClient;
 PubSubClient mqtt(wifiClient);
@@ -74,7 +74,7 @@ void loop() {
   float h = dht.readHumidity();
 
   if (isnan(t) || isnan(h)) {
-    Serial.println("DHT read failed");  
+    Serial.println("DHT read failed");
     delay(2000);
     return;
   }

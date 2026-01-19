@@ -19,3 +19,4 @@ docker compose up -d
 | Host (LAN)     | `<PC_LAN_IP>` (e.g. `192.168.1.50`) |
 | Port           | `1883`                              |
 | Authentication | Disabled (development only)         |
+

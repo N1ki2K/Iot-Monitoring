@@ -1,15 +1,21 @@
+import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: resolve(__dirname, "../../.env") });
 import mqtt from "mqtt";
 import { Pool } from "pg";
 
-const MQTT_URL = process.env.MQTT_URL ?? "mqtt://127.0.0.1:1883";
-const TOPIC = process.env.MQTT_TOPIC ?? "iot/shrek-esp32/telemetry";
+const MQTT_URL = process.env.MQTT_URL!;
+const TOPIC = process.env.MQTT_TOPIC!;
 
 const pool = new Pool({
-  host: process.env.PGHOST ?? "127.0.0.1",
-  port: Number(process.env.PGPORT ?? 5432),
-  user: process.env.PGUSER ?? "iot",
-  password: process.env.PGPASSWORD ?? "iotpass",
-  database: process.env.PGDATABASE ?? "iot",
+  host: process.env.PGHOST,
+  port: Number(process.env.PGPORT),
+  user: process.env.PGUSER,
+  password: process.env.PGPASSWORD,
+  database: process.env.PGDATABASE,
 });
 
 const client = mqtt.connect(MQTT_URL);
@@ -39,8 +45,9 @@ client.on("message", async (topic, payload) => {
   await pool.query(
     `INSERT INTO readings (device_id, temperature_c, humidity_pct, lux, sound, co2_ppm)
      VALUES ($1, $2, $3, $4, $5, $6)`,
-    [deviceId, msg.t ?? null, msg.h ?? null, msg.lux ?? null, msg.sound ?? null, msg.co2 ?? null]
+    [deviceId, msg.t ?? null, msg.h ?? null, msg.lux ?? null, msg.sound ?? null, msg.aq ?? null]
   );
+  
 
   console.log("inserted", deviceId, msg);
 });

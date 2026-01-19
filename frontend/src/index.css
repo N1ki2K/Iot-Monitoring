@@ -1,0 +1,268 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-slate-950: #0a0f1a;
+  --color-slate-900: #0f1419;
+  --color-slate-850: #141b27;
+  --color-slate-800: #1a2332;
+  --color-sensor-temp: #f97316;
+  --color-sensor-humidity: #06b6d4;
+  --color-sensor-light: #fbbf24;
+  --color-sensor-sound: #a855f7;
+  --color-sensor-air: #22c55e;
+
+  --font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-family-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--color-slate-950);
+  color: #f1f5f9;
+  font-family: var(--font-family-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.sensor-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background-color: rgba(26, 35, 50, 0.6);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(51, 65, 85, 0.4);
+  transition: all 0.3s ease;
+}
+
+.sensor-card:hover {
+  border-color: rgba(71, 85, 105, 0.6);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+}
+
+.sensor-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% -20%, var(--glow-color, rgba(255,255,255,0.1)) 0%, transparent 70%);
+}
+
+.sensor-card:hover::before {
+  opacity: 1;
+}
+
+.glow-temp { --glow-color: rgba(249, 115, 22, 0.15); }
+.glow-humidity { --glow-color: rgba(6, 182, 212, 0.15); }
+.glow-light { --glow-color: rgba(251, 191, 36, 0.15); }
+.glow-sound { --glow-color: rgba(168, 85, 247, 0.15); }
+.glow-air { --glow-color: rgba(34, 197, 94, 0.15); }
+
+.data-table {
+  width: 100%;
+  font-size: 0.875rem;
+}
+
+.data-table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+  background-color: rgba(26, 35, 50, 0.5);
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.data-table th:hover {
+  background-color: rgba(51, 65, 85, 0.5);
+}
+
+.data-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(26, 35, 50, 0.5);
+  font-family: var(--font-family-mono);
+  font-size: 0.875rem;
+  color: #d1d5db;
+}
+
+.data-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.data-table tbody tr:hover {
+  background-color: rgba(26, 35, 50, 0.4);
+}
+
+.input {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  border-radius: 0.5rem;
+  background-color: rgba(26, 35, 50, 0.7);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  color: #f1f5f9;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.input::placeholder {
+  color: #6b7280;
+}
+
+.input:focus {
+  outline: none;
+  border-color: rgba(6, 182, 212, 0.5);
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+}
+
+.select {
+  padding: 0.625rem 2.5rem 0.625rem 1rem;
+  border-radius: 0.5rem;
+  background-color: rgba(26, 35, 50, 0.7);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  color: #f1f5f9;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+}
+
+.select:focus {
+  outline: none;
+  border-color: rgba(6, 182, 212, 0.5);
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+}
+
+.btn {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  cursor: pointer;
+  border: none;
+}
+
+.btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-slate-900), 0 0 0 4px currentColor;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: #0891b2;
+  color: white;
+  box-shadow: 0 10px 15px -3px rgba(6, 182, 212, 0.2);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #06b6d4;
+  box-shadow: 0 10px 15px -3px rgba(6, 182, 212, 0.3);
+}
+
+.btn-secondary {
+  background-color: #334155;
+  color: #e2e8f0;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #475569;
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: #9ca3af;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background-color: rgba(26, 35, 50, 1);
+  color: #e2e8f0;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badge-success {
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: var(--color-slate-900);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #334155;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #475569;
+}
+
+/* Recharts customization */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: rgba(255, 255, 255, 0.05);
+}
+
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}
+
+/* Animation utilities */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes slide-up {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-pulse {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

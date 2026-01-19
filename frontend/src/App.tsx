@@ -1,7 +1,7 @@
-import { Dashboard } from './components';
+import { Auth } from './components';
 
 function App() {
-  return <Dashboard />;
+  return <Auth />;
 }
 
 export default App;

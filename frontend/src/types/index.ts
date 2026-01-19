@@ -19,6 +19,34 @@ export interface PaginatedResponse<T> {
   };
 }
 
+export interface AuthUser {
+  id: number;
+  username: string;
+  email: string;
+  is_admin: number;
+  created_at: string;
+}
+
+export type UserListItem = AuthUser;
+
+export interface UserControllerAssignment {
+  user_id: number;
+  controller_id: number;
+  device_id: string;
+  controller_label?: string | null;
+  assignment_label?: string | null;
+  pairing_code?: string | null;
+  created_at: string;
+}
+
+export interface Controller {
+  id: number;
+  device_id: string;
+  label?: string | null;
+  pairing_code: string | null;
+  created_at: string;
+}
+
 export type SensorType = 'temperature' | 'humidity' | 'light' | 'sound' | 'air';
 
 export interface SensorConfig {

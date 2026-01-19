@@ -1,7 +1,12 @@
 import { Cpu } from 'lucide-react';
 
+interface DeviceOption {
+  id: string;
+  label?: string | null;
+}
+
 interface DeviceSelectorProps {
-  devices: string[];
+  devices: DeviceOption[];
   selectedDevice: string;
   onSelect: (device: string) => void;
   isLoading?: boolean;
@@ -29,8 +34,8 @@ export function DeviceSelector({ devices, selectedDevice, onSelect, isLoading }:
       >
         <option value="">All Devices</option>
         {devices.map((device) => (
-          <option key={device} value={device}>
-            {device}
+          <option key={device.id} value={device.id}>
+            {device.label ? `${device.label} (${device.id})` : device.id}
           </option>
         ))}
       </select>

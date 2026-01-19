@@ -7,7 +7,7 @@
 
 #define PIN_LUX   34
 #define PIN_SOUND 35
-#define PIN_AIR   32
+#define PIN_AIR   32  
 
 const char* WIFI_SSID = "Wokwi-GUEST";
 const char* WIFI_PASS = "";

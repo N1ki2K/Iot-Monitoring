@@ -101,10 +101,9 @@ export const api = {
   },
 
   getUserControllers: async (userId: number): Promise<UserControllerAssignment[]> => {
-    const fallbackUserId = getStoredUserId();
     const { data } = await client.get<UserControllerAssignment[]>(`/users/${userId}/controllers`, {
       headers: {
-        'x-user-id': fallbackUserId ?? userId,
+        'x-user-id': userId,
       },
     });
     return data;
@@ -122,6 +121,13 @@ export const api = {
     await client.delete(`/users/${userId}/controllers`, {
       data: { controllerId },
     });
+  },
+
+  updateUserControllerLabel: async (userId: number, controllerId: number, label?: string) => {
+    const { data } = await client.patch(`/users/${userId}/controllers/${controllerId}`, {
+      label,
+    });
+    return data;
   },
 
   getControllers: async (): Promise<Controller[]> => {
@@ -149,6 +155,24 @@ export const api = {
       label,
     });
     return data.controller;
+  },
+
+  getMe: async (): Promise<AuthUser> => {
+    const { data } = await client.get<AuthUser>('/me');
+    return data;
+  },
+
+  updateMe: async (payload: { username: string; email: string }): Promise<AuthUser> => {
+    const { data } = await client.patch<AuthUser>('/me', payload);
+    return data;
+  },
+
+  updatePassword: async (payload: { currentPassword: string; newPassword: string }) => {
+    await client.patch('/me/password', payload);
+  },
+
+  deleteMe: async () => {
+    await client.delete('/me');
   },
 };
 

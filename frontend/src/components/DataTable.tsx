@@ -171,33 +171,73 @@ export function DataTable({ selectedDevice }: DataTableProps) {
           </button>
 
           <div className="flex items-center gap-1">
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              let pageNum: number;
-              if (totalPages <= 5) {
-                pageNum = i + 1;
-              } else if (page <= 3) {
-                pageNum = i + 1;
-              } else if (page >= totalPages - 2) {
-                pageNum = totalPages - 4 + i;
-              } else {
-                pageNum = page - 2 + i;
-              }
+            {(() => {
+              const middlePages = (() => {
+                if (totalPages <= 4) {
+                  return Array.from({ length: totalPages }, (_, i) => i + 1);
+                }
+                if (page <= 2) {
+                  return [1, 2, 3];
+                }
+                if (page >= totalPages - 1) {
+                  return [totalPages - 2, totalPages - 1, totalPages];
+                }
+                return [page - 1, page, page + 1];
+              })();
+              const showLeading = totalPages > 4 && page > 2 && middlePages[0] > 1;
+              const showTrailing = totalPages > 4 && page < totalPages - 1;
+              const showLast = totalPages > 3 && middlePages[middlePages.length - 1] !== totalPages;
 
               return (
-                <button
-                  key={pageNum}
-                  onClick={() => setPage(pageNum)}
-                  disabled={isLoading}
-                  className={`btn px-3 py-1.5 text-sm ${
-                    page === pageNum
-                      ? 'bg-cyan-600 text-white'
-                      : 'btn-ghost'
-                  }`}
-                >
-                  {pageNum}
-                </button>
+                <>
+                  {showLeading && (
+                    <>
+                      <button
+                        onClick={() => setPage(1)}
+                        disabled={isLoading}
+                        className={`btn px-3 py-1.5 text-sm ${
+                          page === 1 ? 'bg-cyan-600 text-white' : 'btn-ghost'
+                        }`}
+                      >
+                        1
+                      </button>
+                      <span className="px-2 text-sm text-gray-500">...</span>
+                    </>
+                  )}
+
+                  {middlePages.map((pageNum) => (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPage(pageNum)}
+                      disabled={isLoading}
+                      className={`btn px-3 py-1.5 text-sm ${
+                        page === pageNum
+                          ? 'bg-cyan-600 text-white'
+                          : 'btn-ghost'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+
+                  {showTrailing && <span className="px-2 text-sm text-gray-500">...</span>}
+
+                  {showLast && (
+                    <button
+                      onClick={() => setPage(totalPages)}
+                      disabled={isLoading}
+                      className={`btn px-3 py-1.5 text-sm ${
+                        page === totalPages
+                          ? 'bg-cyan-600 text-white'
+                          : 'btn-ghost'
+                      }`}
+                    >
+                      {totalPages}
+                    </button>
+                  )}
+                </>
               );
-            })}
+            })()}
           </div>
 
           <button

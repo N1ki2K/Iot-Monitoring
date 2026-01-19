@@ -6,3 +6,4 @@ export { Dashboard } from './Dashboard';
 export { Auth } from './Auth';
 export { AdminDashboard } from './AdminDashboard';
 export { ProfileMenu } from './ProfileMenu';
+export { Settings } from './Settings';

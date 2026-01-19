@@ -16,6 +16,8 @@ export function Auth({ onAuth }: AuthProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -186,11 +188,18 @@ export function Auth({ onAuth }: AuthProps) {
                 <div className="relative mt-2">
                   <input
                     className="input"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                   />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-200"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
                 </div>
               </div>
 
@@ -200,11 +209,18 @@ export function Auth({ onAuth }: AuthProps) {
                   <div className="relative mt-2">
                     <input
                       className="input"
-                      type="password"
+                      type={showConfirmPassword ? 'text' : 'password'}
                       placeholder="••••••••"
                       value={confirmPassword}
                       onChange={(event) => setConfirmPassword(event.target.value)}
                     />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-200"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    >
+                      {showConfirmPassword ? 'Hide' : 'Show'}
+                    </button>
                   </div>
                 </div>
               )}

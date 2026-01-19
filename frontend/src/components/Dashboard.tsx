@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, type FormEvent } from 'react';
-import { Activity, RefreshCw, Plus } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { RefreshCw, Plus } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { Reading, AuthUser } from '../types';
 import { ProfileMenu } from './ProfileMenu';
@@ -15,6 +15,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ user, onLogout }: DashboardProps) {
+  const navigate = useNavigate();
   const [devices, setDevices] = useState<string[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>('');
   const [latestReading, setLatestReading] = useState<Reading | null>(null);
@@ -139,8 +140,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
         <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/25">
-                <Activity className="w-5 h-5 text-white" />
+              <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900/80 border border-slate-700/60 shadow-lg shadow-cyan-500/10">
+                <img src="/IotMonitoring.png" alt="IoT Monitoring" className="w-12 h-12 object-contain" />
               </div>
               <h1 className="text-2xl lg:text-3xl font-bold text-white">
                 IoT Monitoring
@@ -202,7 +203,13 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
-            {user && <ProfileMenu user={user} onLogout={onLogout} />}
+            {user && (
+              <ProfileMenu
+                user={user}
+                onLogout={onLogout}
+                onSettings={() => navigate('/settings')}
+              />
+            )}
           </div>
         </header>
 

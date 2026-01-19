@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Activity } from 'lucide-react';
-import { NavLink, Navigate } from 'react-router-dom';
+import { NavLink, Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { AuthUser, UserListItem, UserControllerAssignment, Controller } from '../types';
 import { ProfileMenu } from './ProfileMenu';
@@ -11,6 +10,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [controllers, setControllers] = useState<Controller[]>([]);
   const [availableDevices, setAvailableDevices] = useState<string[]>([]);
@@ -160,14 +160,14 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       <div className="max-w-7xl mx-auto space-y-8">
         <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/25">
-                <Activity className="w-5 h-5 text-white" />
+            <NavLink to="/" className="flex items-center gap-3 mb-2">
+              <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900/80 border border-slate-700/60 shadow-lg shadow-cyan-500/10">
+                <img src="/IotMonitoring.png" alt="IoT Monitoring" className="w-12 h-12 object-contain" />
               </div>
               <h1 className="text-2xl lg:text-3xl font-bold text-white">
                 IoT Monitoring
               </h1>
-            </div>
+            </NavLink>
             <p className="text-gray-400 text-sm">
               Admin dashboard
             </p>
@@ -197,7 +197,13 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                 Admin Dashboard
               </NavLink>
             </nav>
-            {user && <ProfileMenu user={user} onLogout={onLogout} />}
+            {user && (
+              <ProfileMenu
+                user={user}
+                onLogout={onLogout}
+                onSettings={() => navigate('/settings')}
+              />
+            )}
           </div>
         </header>
 

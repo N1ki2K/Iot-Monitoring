@@ -28,7 +28,13 @@ const getRequester = async (req: express.Request) => {
     `SELECT id, username, email, is_admin, created_at FROM users WHERE id = $1`,
     [requesterId]
   );
-  return result.rows[0] ?? null;
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    ...row,
+    id: Number(row.id),
+    is_admin: Number(row.is_admin),
+  };
 };
 
 const ensureAdmin = (user: { is_admin: number } | null) => {
@@ -134,6 +140,92 @@ app.post("/api/auth/login", async (req, res) => {
   } catch (error) {
     console.error("Login failed:", error);
     return res.status(500).json({ error: "failed to login" });
+  }
+});
+
+app.get("/api/me", async (req, res) => {
+  const requester = await getRequester(req);
+  if (!requester) {
+    return res.status(401).json({ error: "missing user id" });
+  }
+  return res.json(requester);
+});
+
+app.patch("/api/me", async (req, res) => {
+  const requester = await getRequester(req);
+  const { username, email } = req.body ?? {};
+  if (!requester) {
+    return res.status(401).json({ error: "missing user id" });
+  }
+  if (!username || !email) {
+    return res.status(400).json({ error: "username and email are required" });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE users
+       SET username = $1, email = $2
+       WHERE id = $3
+       RETURNING id, username, email, is_admin, created_at`,
+      [username, email, requester.id]
+    );
+    return res.json(result.rows[0]);
+  } catch (error: any) {
+    if (error?.code === "23505") {
+      return res.status(409).json({ error: "username or email already exists" });
+    }
+    console.error("Update profile failed:", error);
+    return res.status(500).json({ error: "failed to update profile" });
+  }
+});
+
+app.patch("/api/me/password", async (req, res) => {
+  const requester = await getRequester(req);
+  const { currentPassword, newPassword } = req.body ?? {};
+  if (!requester) {
+    return res.status(401).json({ error: "missing user id" });
+  }
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "currentPassword and newPassword are required" });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT password FROM users WHERE id = $1`,
+      [requester.id]
+    );
+    const row = result.rows[0];
+    if (!row) {
+      return res.status(404).json({ error: "user not found" });
+    }
+    const ok = await verifyPassword(currentPassword, row.password);
+    if (!ok) {
+      return res.status(401).json({ error: "invalid password" });
+    }
+    const passwordHash = await hashPassword(newPassword);
+    await pool.query(
+      `UPDATE users SET password = $1 WHERE id = $2`,
+      [passwordHash, requester.id]
+    );
+    return res.status(204).send();
+  } catch (error) {
+    console.error("Update password failed:", error);
+    return res.status(500).json({ error: "failed to update password" });
+  }
+});
+
+app.delete("/api/me", async (req, res) => {
+  const requester = await getRequester(req);
+  if (!requester) {
+    return res.status(401).json({ error: "missing user id" });
+  }
+
+  try {
+    await pool.query(`DELETE FROM users WHERE id = $1`, [requester.id]);
+    return res.status(204).send();
+  } catch (error) {
+    console.error("Delete account failed:", error);
+    return res.status(500).json({ error: "failed to delete account" });
   }
 });
 
@@ -343,6 +435,36 @@ app.post("/api/users/:userId/controllers", async (req, res) => {
   }
 });
 
+app.patch("/api/users/:userId/controllers/:controllerId", async (req, res) => {
+  const requester = await getRequester(req);
+  const userId = Number(req.params.userId);
+  const controllerId = Number(req.params.controllerId);
+  const { label } = req.body ?? {};
+  if (!requester || !userId || !controllerId) {
+    return res.status(400).json({ error: "invalid user or controller id" });
+  }
+  if (!ensureAdmin(requester) && requester.id !== userId) {
+    return res.status(403).json({ error: "access denied" });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE user_controllers
+       SET label = $1
+       WHERE user_id = $2 AND controller_id = $3
+       RETURNING user_id, controller_id, label`,
+      [label ?? null, userId, controllerId]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "assignment not found" });
+    }
+    return res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Update controller label failed:", error);
+    return res.status(500).json({ error: "failed to update controller label" });
+  }
+});
+
 app.delete("/api/users/:userId/controllers", async (req, res) => {
   const requester = await getRequester(req);
   const userId = Number(req.params.userId);
@@ -350,8 +472,8 @@ app.delete("/api/users/:userId/controllers", async (req, res) => {
   if (!requester || !userId || !controllerId) {
     return res.status(400).json({ error: "userId and controllerId are required" });
   }
-  if (!ensureAdmin(requester)) {
-    return res.status(403).json({ error: "admin access required" });
+  if (!ensureAdmin(requester) && requester.id !== userId) {
+    return res.status(403).json({ error: "access denied" });
   }
 
   try {

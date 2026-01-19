@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Auth, Dashboard, AdminDashboard } from './components';
+import { Auth, Dashboard, AdminDashboard, Settings } from './components';
 import type { AuthUser } from './types';
 
 function App() {
@@ -17,11 +17,19 @@ function App() {
   const handleAuth = (nextUser: AuthUser) => {
     localStorage.setItem('authUser', JSON.stringify(nextUser));
     setUser(nextUser);
+    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+      window.history.replaceState(null, '', '/');
+    }
   };
 
   const handleLogout = () => {
     localStorage.removeItem('authUser');
     setUser(null);
+  };
+
+  const handleUserUpdated = (nextUser: AuthUser) => {
+    localStorage.setItem('authUser', JSON.stringify(nextUser));
+    setUser(nextUser);
   };
 
   if (!user) {
@@ -41,6 +49,10 @@ function App() {
               <Navigate to="/" replace />
             )
           }
+        />
+        <Route
+          path="/settings"
+          element={<Settings user={user} onUserUpdated={handleUserUpdated} onLogout={handleLogout} />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -14,11 +14,7 @@ const getInitials = (value: string) =>
     .map((part) => part[0]?.toUpperCase())
     .join('');
 
-export function ProfileMenu({
-  user,
-  onLogout,
-  onSettings = () => {},
-}: ProfileMenuProps) {
+export function ProfileMenu({ user, onLogout, onSettings }: ProfileMenuProps) {
   const label = user.username || user.email;
   const initials = getInitials(label);
 
@@ -36,13 +32,15 @@ export function ProfileMenu({
         </div>
       </summary>
       <div className="absolute right-0 mt-2 w-44 rounded-xl bg-slate-900 border border-slate-700/60 shadow-xl p-1 z-20">
-        <button
-          type="button"
-          onClick={onSettings}
-          className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-slate-800/60 rounded-lg"
-        >
-          Settings
-        </button>
+        {onSettings && (
+          <button
+            type="button"
+            onClick={onSettings}
+            className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-slate-800/60 rounded-lg"
+          >
+            Settings
+          </button>
+        )}
         <button
           type="button"
           onClick={onLogout}

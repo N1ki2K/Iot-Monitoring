@@ -5,7 +5,10 @@
       "Bash(npm install:*)",
       "Bash(npx tailwindcss:*)",
       "Bash(sudo chown:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(find:*)",
+      "Bash(mvn compile:*)",
+      "Bash(ip -4 addr show:*)"
     ]
   }
 }

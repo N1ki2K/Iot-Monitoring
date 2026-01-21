@@ -1,5 +1,6 @@
 package com.monitoring.iotmon.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.monitoring.iotmon.data.models.AuthUser
 import com.monitoring.iotmon.data.models.Controller
+import com.monitoring.iotmon.ui.components.QRCodeDialog
 import com.monitoring.iotmon.ui.theme.*
 
 data class AdminState(
@@ -230,6 +232,18 @@ fun UserCard(user: AuthUser) {
 
 @Composable
 fun ControllersTab(controllers: List<Controller>) {
+    var selectedController by remember { mutableStateOf<Controller?>(null) }
+
+    // QR Code Dialog
+    selectedController?.let { controller ->
+        QRCodeDialog(
+            title = controller.label ?: "Device",
+            code = controller.pairingCode,
+            deviceId = controller.deviceId,
+            onDismiss = { selectedController = null }
+        )
+    }
+
     if (controllers.isEmpty()) {
         Box(
             modifier = Modifier
@@ -247,16 +261,24 @@ fun ControllersTab(controllers: List<Controller>) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(controllers) { controller ->
-                ControllerCard(controller = controller)
+                ControllerCard(
+                    controller = controller,
+                    onClick = { selectedController = controller }
+                )
             }
         }
     }
 }
 
 @Composable
-fun ControllerCard(controller: Controller) {
+fun ControllerCard(
+    controller: Controller,
+    onClick: () -> Unit = {}
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Slate800)
     ) {
@@ -312,6 +334,14 @@ fun ControllerCard(controller: Controller) {
                     )
                 }
             }
+
+            // QR Code indicator
+            Icon(
+                Icons.Default.QrCode2,
+                contentDescription = "View QR Code",
+                tint = Cyan500,
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }

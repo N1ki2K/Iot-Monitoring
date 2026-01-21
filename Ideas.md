@@ -13,13 +13,13 @@
 - [ ] **Push notifications** - Get notified when thresholds are exceeded
 
 ### User Experience
-- [ ] **QR code scanner** - Scan device QR code to claim instead of typing
+- [x] **QR code scanner** - Scan device QR code to claim instead of typing ✓
 - [ ] **Biometric login** - Fingerprint/face unlock
-- [ ] **Dark/Light theme toggle**
+- [x] **Dark/Light theme toggle** ✓
 - [ ] **Home screen widget** - Show current readings without opening app
 
 ### Device Management
-- [ ] **Device status** - Show online/offline status, last seen time
+- [x] **Device status** - Show online/offline status, last seen time ✓
 - [ ] **Device location** - Associate devices with rooms/locations
 - [ ] **Device grouping** - Group devices by location or type
 

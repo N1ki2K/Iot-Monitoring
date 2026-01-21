@@ -5,7 +5,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +26,18 @@ fun ClaimDeviceDialog(
 ) {
     var code by remember { mutableStateOf("") }
     var label by remember { mutableStateOf("") }
+    var showQRScanner by remember { mutableStateOf(false) }
+
+    // QR Scanner Dialog
+    if (showQRScanner) {
+        QRScannerDialog(
+            onDismiss = { showQRScanner = false },
+            onCodeScanned = { scannedCode ->
+                code = scannedCode
+                showQRScanner = false
+            }
+        )
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -72,34 +84,53 @@ fun ClaimDeviceDialog(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Pairing Code Input
-                OutlinedTextField(
-                    value = code,
-                    onValueChange = {
-                        if (it.length <= 5 && it.all { c -> c.isDigit() }) {
-                            code = it
-                        }
-                    },
-                    label = { Text("Pairing Code") },
-                    placeholder = { Text("12345") },
-                    leadingIcon = {
-                        Icon(Icons.Default.QrCode, contentDescription = null)
-                    },
-                    singleLine = true,
+                // Pairing Code Input with QR Scanner
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Cyan500,
-                        focusedLabelColor = Cyan500,
-                        cursorColor = Cyan500
-                    ),
-                    textStyle = MaterialTheme.typography.headlineSmall.copy(
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Bold
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = code,
+                        onValueChange = {
+                            if (it.length <= 5 && it.all { c -> c.isDigit() }) {
+                                code = it
+                            }
+                        },
+                        label = { Text("Pairing Code") },
+                        placeholder = { Text("12345") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Cyan500,
+                            focusedLabelColor = Cyan500,
+                            cursorColor = Cyan500
+                        ),
+                        textStyle = MaterialTheme.typography.headlineSmall.copy(
+                            textAlign = TextAlign.Center,
+                            fontWeight = FontWeight.Bold
+                        )
                     )
-                )
+
+                    // QR Scan Button
+                    FilledTonalButton(
+                        onClick = { showQRScanner = true },
+                        modifier = Modifier.height(56.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = Cyan500.copy(alpha = 0.2f),
+                            contentColor = Cyan500
+                        )
+                    ) {
+                        Icon(
+                            Icons.Default.QrCodeScanner,
+                            contentDescription = "Scan QR Code",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 

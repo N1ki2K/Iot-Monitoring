@@ -1,6 +1,7 @@
 package com.monitoring.iotmon.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -22,6 +23,7 @@ import com.monitoring.iotmon.data.models.AuthUser
 import com.monitoring.iotmon.ui.components.*
 import com.monitoring.iotmon.ui.theme.*
 import com.monitoring.iotmon.ui.viewmodel.DashboardState
+import com.monitoring.iotmon.ui.viewmodel.DeviceStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,6 +40,17 @@ fun DashboardScreen(
 ) {
     var showDeviceMenu by remember { mutableStateOf(false) }
     var showProfileMenu by remember { mutableStateOf(false) }
+    var showQRCode by remember { mutableStateOf(false) }
+
+    // QR Code Dialog
+    if (showQRCode && state.selectedDevice != null && state.selectedDevicePairingCode != null) {
+        QRCodeDialog(
+            title = "Share Device",
+            code = state.selectedDevicePairingCode,
+            deviceId = state.selectedDevice,
+            onDismiss = { showQRCode = false }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -270,7 +283,93 @@ fun DashboardScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                // Device Status Card
+                if (state.selectedDevice != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Slate800),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Status indicator
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when (state.deviceStatus) {
+                                            DeviceStatus.ONLINE -> SuccessColor
+                                            DeviceStatus.OFFLINE -> ErrorColor
+                                            DeviceStatus.UNKNOWN -> Slate400
+                                        }
+                                    )
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = when (state.deviceStatus) {
+                                    DeviceStatus.ONLINE -> "Online"
+                                    DeviceStatus.OFFLINE -> "Offline"
+                                    DeviceStatus.UNKNOWN -> "Unknown"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = when (state.deviceStatus) {
+                                    DeviceStatus.ONLINE -> SuccessColor
+                                    DeviceStatus.OFFLINE -> ErrorColor
+                                    DeviceStatus.UNKNOWN -> Slate400
+                                }
+                            )
+                            if (state.lastSeen != null) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "• ${state.lastSeen}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Slate400
+                                )
+                            }
+                            Spacer(modifier = Modifier.weight(1f))
+
+                            // QR Code button
+                            if (state.selectedDevicePairingCode != null) {
+                                IconButton(
+                                    onClick = { showQRCode = true },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.QrCode2,
+                                        contentDescription = "Share QR Code",
+                                        tint = Cyan500,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                            }
+
+                            Icon(
+                                when (state.deviceStatus) {
+                                    DeviceStatus.ONLINE -> Icons.Default.Wifi
+                                    DeviceStatus.OFFLINE -> Icons.Default.WifiOff
+                                    DeviceStatus.UNKNOWN -> Icons.Default.QuestionMark
+                                },
+                                contentDescription = null,
+                                tint = when (state.deviceStatus) {
+                                    DeviceStatus.ONLINE -> SuccessColor
+                                    DeviceStatus.OFFLINE -> ErrorColor
+                                    DeviceStatus.UNKNOWN -> Slate400
+                                },
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Sensor Cards
                 if (state.latestReading != null) {

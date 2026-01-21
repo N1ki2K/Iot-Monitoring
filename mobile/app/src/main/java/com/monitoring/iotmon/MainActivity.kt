@@ -11,6 +11,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import com.monitoring.iotmon.data.preferences.UserPreferences
 import com.monitoring.iotmon.ui.components.ClaimDeviceDialog
 import com.monitoring.iotmon.ui.components.SensorType
 import com.monitoring.iotmon.ui.navigation.Screen
@@ -24,21 +25,38 @@ import com.monitoring.iotmon.ui.viewmodel.AdminViewModel
 import com.monitoring.iotmon.ui.viewmodel.AuthViewModel
 import com.monitoring.iotmon.ui.viewmodel.DashboardViewModel
 import com.monitoring.iotmon.ui.viewmodel.SettingsViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val userPreferences = UserPreferences(applicationContext)
+
         setContent {
-            IotMonTheme {
-                IoTMonitorApp()
+            val isDarkMode by userPreferences.darkModeFlow.collectAsState(initial = true)
+            val coroutineScope = rememberCoroutineScope()
+
+            IotMonTheme(darkTheme = isDarkMode) {
+                IoTMonitorApp(
+                    isDarkMode = isDarkMode,
+                    onToggleDarkMode = { enabled ->
+                        coroutineScope.launch {
+                            userPreferences.setDarkMode(enabled)
+                        }
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-fun IoTMonitorApp() {
+fun IoTMonitorApp(
+    isDarkMode: Boolean = true,
+    onToggleDarkMode: (Boolean) -> Unit = {}
+) {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = viewModel()
     val dashboardViewModel: DashboardViewModel = viewModel()
@@ -142,6 +160,7 @@ fun IoTMonitorApp() {
                 SettingsScreen(
                     user = user,
                     state = settingsState,
+                    isDarkMode = isDarkMode,
                     onBack = { navController.popBackStack() },
                     onUpdateProfile = { username, email ->
                         settingsViewModel.updateProfile(username, email) { updatedUser ->
@@ -166,6 +185,7 @@ fun IoTMonitorApp() {
                         // Reload devices after removal
                         dashboardViewModel.loadDevices(user.id, user.isAdmin == 1)
                     },
+                    onToggleDarkMode = onToggleDarkMode,
                     onClearError = { settingsViewModel.clearError() },
                     onClearSuccess = { settingsViewModel.clearSuccessMessage() }
                 )

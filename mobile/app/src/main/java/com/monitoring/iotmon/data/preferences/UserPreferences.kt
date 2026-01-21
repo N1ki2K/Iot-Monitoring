@@ -17,6 +17,17 @@ class UserPreferences(private val context: Context) {
         private val USERNAME = stringPreferencesKey("username")
         private val EMAIL = stringPreferencesKey("email")
         private val IS_ADMIN = intPreferencesKey("is_admin")
+        private val DARK_MODE = booleanPreferencesKey("dark_mode")
+    }
+
+    val darkModeFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[DARK_MODE] ?: true // Default to dark mode
+    }
+
+    suspend fun setDarkMode(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[DARK_MODE] = enabled
+        }
     }
 
     val userFlow: Flow<AuthUser?> = context.dataStore.data.map { preferences ->

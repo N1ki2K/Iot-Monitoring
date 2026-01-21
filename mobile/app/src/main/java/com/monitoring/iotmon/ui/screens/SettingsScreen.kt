@@ -23,12 +23,14 @@ import com.monitoring.iotmon.ui.viewmodel.SettingsState
 fun SettingsScreen(
     user: AuthUser,
     state: SettingsState,
+    isDarkMode: Boolean,
     onBack: () -> Unit,
     onUpdateProfile: (username: String, email: String) -> Unit,
     onChangePassword: (current: String, new: String) -> Unit,
     onDeleteAccount: () -> Unit,
     onUpdateDeviceLabel: (controllerId: Int, label: String?) -> Unit,
     onRemoveDevice: (controllerId: Int) -> Unit,
+    onToggleDarkMode: (Boolean) -> Unit,
     onClearError: () -> Unit,
     onClearSuccess: () -> Unit
 ) {
@@ -240,6 +242,62 @@ fun SettingsScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // Appearance Section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "Appearance",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Dark Mode",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    text = if (isDarkMode) "On" else "Off",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = isDarkMode,
+                            onCheckedChange = onToggleDarkMode,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            )
+                        )
                     }
                 }
             }

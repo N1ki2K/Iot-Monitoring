@@ -8,7 +8,9 @@
       "Bash(npm run build:*)",
       "Bash(find:*)",
       "Bash(mvn compile:*)",
-      "Bash(ip -4 addr show:*)"
+      "Bash(ip -4 addr show:*)",
+      "Bash(tree:*)",
+      "Bash(ip route:*)"
     ]
   }
 }

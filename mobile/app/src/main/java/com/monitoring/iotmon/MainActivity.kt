@@ -9,11 +9,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.monitoring.iotmon.ui.components.ClaimDeviceDialog
+import com.monitoring.iotmon.ui.components.SensorType
 import com.monitoring.iotmon.ui.navigation.Screen
 import com.monitoring.iotmon.ui.screens.AdminScreen
 import com.monitoring.iotmon.ui.screens.AuthScreen
 import com.monitoring.iotmon.ui.screens.DashboardScreen
+import com.monitoring.iotmon.ui.screens.SensorDetailScreen
 import com.monitoring.iotmon.ui.screens.SettingsScreen
 import com.monitoring.iotmon.ui.theme.IotMonTheme
 import com.monitoring.iotmon.ui.viewmodel.AdminViewModel
@@ -105,7 +109,10 @@ fun IoTMonitorApp() {
                         navController.navigate(Screen.Admin.route)
                     },
                     onClaimDevice = { showClaimDialog = true },
-                    onLogout = { authViewModel.logout() }
+                    onLogout = { authViewModel.logout() },
+                    onSensorClick = { sensorType ->
+                        navController.navigate(Screen.SensorDetail.createRoute(sensorType.name))
+                    }
                 )
 
                 // Claim Device Dialog
@@ -174,6 +181,25 @@ fun IoTMonitorApp() {
                     onRefresh = { adminViewModel.refresh() }
                 )
             }
+        }
+
+        composable(
+            route = Screen.SensorDetail.route,
+            arguments = listOf(navArgument("sensorType") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val sensorTypeArg = backStackEntry.arguments?.getString("sensorType") ?: "TEMPERATURE"
+            val sensorType = try {
+                SensorType.valueOf(sensorTypeArg)
+            } catch (e: IllegalArgumentException) {
+                SensorType.TEMPERATURE
+            }
+
+            SensorDetailScreen(
+                sensorType = sensorType,
+                readings = dashboardState.history,
+                isLoading = dashboardState.isLoading,
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }

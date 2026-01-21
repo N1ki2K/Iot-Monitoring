@@ -8,7 +8,7 @@
 // MQTT Broker Configuration
 // Local Mosquitto: "localhost" or "127.0.0.1" or your IP
 // Wokwi Web (HiveMQ): "broker.hivemq.com"
-#define MQTT_HOST "192.168.1.102"
+#define MQTT_HOST "10.232.149.86"
 #define MQTT_PORT 1883
 
 // MQTT Topic

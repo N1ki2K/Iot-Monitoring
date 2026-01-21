@@ -15,7 +15,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.monitoring.iotmon.ui.theme.*
 
 enum class SensorType {
@@ -31,7 +30,37 @@ fun SensorCard(
     type: SensorType,
     value: String?,
     unit: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
+) {
+    val cardColors = CardDefaults.cardColors(containerColor = Slate800)
+    val cardShape = RoundedCornerShape(16.dp)
+
+    if (onClick != null) {
+        Card(
+            modifier = modifier,
+            shape = cardShape,
+            colors = cardColors,
+            onClick = onClick
+        ) {
+            SensorCardContent(type = type, value = value, unit = unit)
+        }
+    } else {
+        Card(
+            modifier = modifier,
+            shape = cardShape,
+            colors = cardColors
+        ) {
+            SensorCardContent(type = type, value = value, unit = unit)
+        }
+    }
+}
+
+@Composable
+private fun SensorCardContent(
+    type: SensorType,
+    value: String?,
+    unit: String
 ) {
     val (icon, color, label) = when (type) {
         SensorType.TEMPERATURE -> Triple(Icons.Default.Thermostat, TemperatureColor, "Temperature")
@@ -41,83 +70,75 @@ fun SensorCard(
         SensorType.AIR_QUALITY -> Triple(Icons.Default.Air, AirQualityColor, "Air Quality")
     }
 
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Slate800
-        )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
+        // Icon with colored background
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .size(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            color.copy(alpha = 0.3f),
+                            color.copy(alpha = 0.1f)
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            // Icon with colored background
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = color,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Label
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = Slate400
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Value
+        if (value != null) {
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = unit,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Slate400,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+            }
+        } else {
+            // Loading skeleton
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                color.copy(alpha = 0.3f),
-                                color.copy(alpha = 0.1f)
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = color,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Label
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = Slate400
+                    .width(60.dp)
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Slate700)
             )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Value
-            if (value != null) {
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = value,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = unit,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Slate400,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                }
-            } else {
-                // Loading skeleton
-                Box(
-                    modifier = Modifier
-                        .width(60.dp)
-                        .height(32.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Slate700)
-                )
-            }
         }
     }
 }
@@ -129,7 +150,8 @@ fun SensorCardsGrid(
     light: Int?,
     sound: Int?,
     airQuality: Int?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSensorClick: (SensorType) -> Unit = {}
 ) {
     Column(modifier = modifier) {
         // First row - Temperature and Humidity
@@ -141,13 +163,15 @@ fun SensorCardsGrid(
                 type = SensorType.TEMPERATURE,
                 value = temperature?.let { String.format("%.1f", it) },
                 unit = "°C",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                onClick = { onSensorClick(SensorType.TEMPERATURE) }
             )
             SensorCard(
                 type = SensorType.HUMIDITY,
                 value = humidity?.let { String.format("%.1f", it) },
                 unit = "%",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                onClick = { onSensorClick(SensorType.HUMIDITY) }
             )
         }
 
@@ -162,19 +186,22 @@ fun SensorCardsGrid(
                 type = SensorType.LIGHT,
                 value = light?.toString(),
                 unit = "lux",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                onClick = { onSensorClick(SensorType.LIGHT) }
             )
             SensorCard(
                 type = SensorType.SOUND,
                 value = sound?.toString(),
                 unit = "dB",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                onClick = { onSensorClick(SensorType.SOUND) }
             )
             SensorCard(
                 type = SensorType.AIR_QUALITY,
                 value = airQuality?.toString(),
                 unit = "ppm",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                onClick = { onSensorClick(SensorType.AIR_QUALITY) }
             )
         }
     }

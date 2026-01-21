@@ -9,6 +9,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +33,8 @@ fun DashboardScreen(
     onSettingsClick: () -> Unit,
     onAdminClick: () -> Unit,
     onClaimDevice: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onSensorClick: (SensorType) -> Unit = {}
 ) {
     var showDeviceMenu by remember { mutableStateOf(false) }
     var showProfileMenu by remember { mutableStateOf(false) }
@@ -159,7 +162,7 @@ fun DashboardScreen(
         },
         containerColor = Slate950
     ) { paddingValues ->
-        if (state.isLoading) {
+        if (state.isLoading && !state.isRefreshing) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -169,14 +172,20 @@ fun DashboardScreen(
                 CircularProgressIndicator(color = Cyan500)
             }
         } else {
-            Column(
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = onRefresh,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp)
             ) {
-                // Device Selector
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp)
+                ) {
+                    // Device Selector
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -270,7 +279,8 @@ fun DashboardScreen(
                         humidity = state.latestReading.humidityPct,
                         light = state.latestReading.lux,
                         sound = state.latestReading.sound,
-                        airQuality = state.latestReading.co2Ppm
+                        airQuality = state.latestReading.co2Ppm,
+                        onSensorClick = onSensorClick
                     )
                 } else {
                     // No data state
@@ -349,6 +359,7 @@ fun DashboardScreen(
                             )
                         }
                     }
+                }
                 }
             }
         }

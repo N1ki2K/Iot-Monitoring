@@ -5,4 +5,7 @@ sealed class Screen(val route: String) {
     data object Dashboard : Screen("dashboard")
     data object Settings : Screen("settings")
     data object Admin : Screen("admin")
+    data object SensorDetail : Screen("sensor/{sensorType}") {
+        fun createRoute(sensorType: String) = "sensor/$sensorType"
+    }
 }

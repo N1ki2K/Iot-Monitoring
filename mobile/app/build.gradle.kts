@@ -98,6 +98,12 @@ dependencies {
     // ZXing for QR code generation
     implementation(libs.zxing.core)
 
+    // Biometric authentication
+    implementation(libs.androidx.biometric)
+
+    // WorkManager for background tasks
+    implementation(libs.androidx.work.runtime)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

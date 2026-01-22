@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
@@ -37,6 +38,8 @@ fun AuthScreen(
     state: AuthState,
     onLogin: (String, String) -> Unit,
     onRegister: (String, String, String) -> Unit,
+    onBiometricLogin: () -> Unit = {},
+    showBiometricButton: Boolean = false,
     onClearError: () -> Unit
 ) {
     var isLoginMode by remember { mutableStateOf(true) }
@@ -263,6 +266,34 @@ fun AuthScreen(
                         } else {
                             Text(
                                 text = if (isLoginMode) "Login" else "Create Account",
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    // Biometric login button
+                    if (showBiometricButton && isLoginMode) {
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        OutlinedButton(
+                            onClick = onBiometricLogin,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            enabled = !state.isLoading,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Cyan500
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Fingerprint,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Login with Biometrics",
                                 fontWeight = FontWeight.SemiBold
                             )
                         }

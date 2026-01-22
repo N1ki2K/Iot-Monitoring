@@ -1,16 +1,20 @@
 package com.monitoring.iotmon.ui.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.monitoring.iotmon.data.models.Reading
 import com.monitoring.iotmon.data.models.UserControllerAssignment
+import com.monitoring.iotmon.data.preferences.UserPreferences
 import com.monitoring.iotmon.data.repository.IoTRepository
 import com.monitoring.iotmon.data.repository.Result
+import com.monitoring.iotmon.util.NotificationHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -30,15 +34,23 @@ data class DashboardState(
     val lastSeen: String? = null
 )
 
-class DashboardViewModel : ViewModel() {
+class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = IoTRepository()
+    private val userPreferences = UserPreferences(application)
+    private val notificationHelper = NotificationHelper(application)
 
     private val _state = MutableStateFlow(DashboardState())
     val state: StateFlow<DashboardState> = _state.asStateFlow()
 
     private var autoRefreshJob: Job? = null
     private var controllerMap: Map<String, String> = emptyMap() // deviceId -> pairingCode
+
+    // Track last alerted values to avoid duplicate notifications
+    private val lastAlertedTemp = mutableMapOf<String, Float?>()
+    private val lastAlertedHumidity = mutableMapOf<String, Float?>()
+    private val lastAlertedNoise = mutableMapOf<String, Float?>()
+    private val lastDeviceStatus = mutableMapOf<String, DeviceStatus>()
 
     fun loadDevices(userId: Int, isAdmin: Boolean) {
         viewModelScope.launch {
@@ -114,6 +126,11 @@ class DashboardViewModel : ViewModel() {
                         deviceStatus = status,
                         lastSeen = lastSeen
                     )
+
+                    // Check thresholds and send notifications
+                    if (reading != null) {
+                        checkThresholdsAndNotify(deviceId, reading, status, lastSeen)
+                    }
                 }
                 is Result.Error -> {
                     _state.value = _state.value.copy(
@@ -165,6 +182,97 @@ class DashboardViewModel : ViewModel() {
 
     fun clearError() {
         _state.value = _state.value.copy(error = null)
+    }
+
+    private fun checkThresholdsAndNotify(deviceId: String, reading: Reading, status: DeviceStatus, lastSeen: String?) {
+        viewModelScope.launch {
+            val settings = userPreferences.thresholdSettingsFlow.first()
+
+            // Check if notifications are enabled
+            if (!settings.notificationsEnabled) return@launch
+
+            val deviceLabel = deviceId
+
+            // Check temperature
+            if (settings.tempAlertsEnabled) {
+                val temp = reading.temperatureC?.toFloat()
+                if (temp != null) {
+                    val wasInRange = lastAlertedTemp[deviceId]?.let {
+                        it >= settings.tempLowThreshold && it <= settings.tempHighThreshold
+                    } ?: true
+                    val isOutOfRange = temp < settings.tempLowThreshold || temp > settings.tempHighThreshold
+
+                    if (isOutOfRange && wasInRange) {
+                        val isHigh = temp > settings.tempHighThreshold
+                        val threshold = if (isHigh) settings.tempHighThreshold else settings.tempLowThreshold
+                        notificationHelper.sendThresholdAlert(
+                            title = "Temperature Alert - $deviceLabel",
+                            message = "Temperature is ${if (isHigh) "above" else "below"} threshold",
+                            sensorType = "Temperature",
+                            currentValue = temp,
+                            thresholdValue = threshold,
+                            isHigh = isHigh
+                        )
+                    }
+                    lastAlertedTemp[deviceId] = temp
+                }
+            }
+
+            // Check humidity
+            if (settings.humidityAlertsEnabled) {
+                val humidity = reading.humidityPct?.toFloat()
+                if (humidity != null) {
+                    val wasInRange = lastAlertedHumidity[deviceId]?.let {
+                        it >= settings.humidityLowThreshold && it <= settings.humidityHighThreshold
+                    } ?: true
+                    val isOutOfRange = humidity < settings.humidityLowThreshold || humidity > settings.humidityHighThreshold
+
+                    if (isOutOfRange && wasInRange) {
+                        val isHigh = humidity > settings.humidityHighThreshold
+                        val threshold = if (isHigh) settings.humidityHighThreshold else settings.humidityLowThreshold
+                        notificationHelper.sendThresholdAlert(
+                            title = "Humidity Alert - $deviceLabel",
+                            message = "Humidity is ${if (isHigh) "above" else "below"} threshold",
+                            sensorType = "Humidity",
+                            currentValue = humidity,
+                            thresholdValue = threshold,
+                            isHigh = isHigh
+                        )
+                    }
+                    lastAlertedHumidity[deviceId] = humidity
+                }
+            }
+
+            // Check noise
+            if (settings.noiseAlertsEnabled) {
+                val noise = reading.sound?.toFloat()
+                if (noise != null) {
+                    val wasInRange = lastAlertedNoise[deviceId]?.let { it <= settings.noiseHighThreshold } ?: true
+                    val isOutOfRange = noise > settings.noiseHighThreshold
+
+                    if (isOutOfRange && wasInRange) {
+                        notificationHelper.sendThresholdAlert(
+                            title = "Noise Alert - $deviceLabel",
+                            message = "Noise level exceeded threshold",
+                            sensorType = "Noise",
+                            currentValue = noise,
+                            thresholdValue = settings.noiseHighThreshold,
+                            isHigh = true
+                        )
+                    }
+                    lastAlertedNoise[deviceId] = noise
+                }
+            }
+
+            // Check device offline
+            if (settings.deviceOfflineAlerts) {
+                val previousStatus = lastDeviceStatus[deviceId]
+                if (previousStatus == DeviceStatus.ONLINE && status == DeviceStatus.OFFLINE) {
+                    notificationHelper.sendDeviceOfflineAlert(deviceLabel, lastSeen ?: "Unknown")
+                }
+                lastDeviceStatus[deviceId] = status
+            }
+        }
     }
 
     private fun calculateDeviceStatus(timestamp: String): Pair<DeviceStatus, String?> {

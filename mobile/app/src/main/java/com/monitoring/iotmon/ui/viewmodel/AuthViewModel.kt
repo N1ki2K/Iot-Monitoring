@@ -17,7 +17,9 @@ data class AuthState(
     val isLoading: Boolean = false,
     val user: AuthUser? = null,
     val error: String? = null,
-    val isLoggedIn: Boolean = false
+    val isLoggedIn: Boolean = false,
+    val biometricEnabled: Boolean = false,
+    val hasSavedCredentials: Boolean = false
 )
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
@@ -41,15 +43,35 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+
+        // Check biometric settings
+        viewModelScope.launch {
+            preferences.biometricEnabledFlow.collect { enabled ->
+                _state.value = _state.value.copy(biometricEnabled = enabled)
+            }
+        }
+
+        // Check for saved credentials
+        viewModelScope.launch {
+            val (email, password) = preferences.getCredentials()
+            _state.value = _state.value.copy(
+                hasSavedCredentials = email != null && password != null
+            )
+        }
     }
 
-    fun login(email: String, password: String) {
+    fun login(email: String, password: String, saveForBiometric: Boolean = false) {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
 
             when (val result = repository.login(email, password)) {
                 is Result.Success -> {
                     preferences.saveUser(result.data)
+                    // Save credentials for biometric login if enabled
+                    if (saveForBiometric || _state.value.biometricEnabled) {
+                        preferences.saveCredentials(email, password)
+                        _state.value = _state.value.copy(hasSavedCredentials = true)
+                    }
                     _state.value = _state.value.copy(
                         isLoading = false,
                         user = result.data,
@@ -64,6 +86,41 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }
+        }
+    }
+
+    fun loginWithBiometric() {
+        viewModelScope.launch {
+            val (email, password) = preferences.getCredentials()
+            if (email != null && password != null) {
+                login(email, password)
+            } else {
+                _state.value = _state.value.copy(
+                    error = "No saved credentials. Please login with password first."
+                )
+            }
+        }
+    }
+
+    fun enableBiometric(email: String, password: String) {
+        viewModelScope.launch {
+            preferences.setBiometricEnabled(true)
+            preferences.saveCredentials(email, password)
+            _state.value = _state.value.copy(
+                biometricEnabled = true,
+                hasSavedCredentials = true
+            )
+        }
+    }
+
+    fun disableBiometric() {
+        viewModelScope.launch {
+            preferences.setBiometricEnabled(false)
+            preferences.clearCredentials()
+            _state.value = _state.value.copy(
+                biometricEnabled = false,
+                hasSavedCredentials = false
+            )
         }
     }
 
@@ -94,6 +151,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun logout() {
         viewModelScope.launch {
             preferences.clearUser()
+            preferences.clearCredentials()
             repository.logout()
             _state.value = AuthState()
         }

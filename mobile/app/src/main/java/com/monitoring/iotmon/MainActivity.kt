@@ -1,10 +1,10 @@
 package com.monitoring.iotmon
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -19,20 +19,28 @@ import com.monitoring.iotmon.ui.screens.AdminScreen
 import com.monitoring.iotmon.ui.screens.AuthScreen
 import com.monitoring.iotmon.ui.screens.DashboardScreen
 import com.monitoring.iotmon.ui.screens.SensorDetailScreen
+import com.monitoring.iotmon.ui.screens.NotificationSettingsScreen
 import com.monitoring.iotmon.ui.screens.SettingsScreen
 import com.monitoring.iotmon.ui.theme.IotMonTheme
 import com.monitoring.iotmon.ui.viewmodel.AdminViewModel
+import com.monitoring.iotmon.ui.viewmodel.NotificationSettingsViewModel
 import com.monitoring.iotmon.ui.viewmodel.AuthViewModel
 import com.monitoring.iotmon.ui.viewmodel.DashboardViewModel
 import com.monitoring.iotmon.ui.viewmodel.SettingsViewModel
+import com.monitoring.iotmon.util.BiometricHelper
+import com.monitoring.iotmon.util.BiometricResult
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+    private lateinit var biometricHelper: BiometricHelper
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         val userPreferences = UserPreferences(applicationContext)
+        biometricHelper = BiometricHelper(applicationContext)
+        val isBiometricAvailable = biometricHelper.isBiometricAvailable()
 
         setContent {
             val isDarkMode by userPreferences.darkModeFlow.collectAsState(initial = true)
@@ -40,6 +48,9 @@ class MainActivity : ComponentActivity() {
 
             IotMonTheme(darkTheme = isDarkMode) {
                 IoTMonitorApp(
+                    activity = this,
+                    biometricHelper = biometricHelper,
+                    isBiometricAvailable = isBiometricAvailable,
                     isDarkMode = isDarkMode,
                     onToggleDarkMode = { enabled ->
                         coroutineScope.launch {
@@ -54,6 +65,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun IoTMonitorApp(
+    activity: FragmentActivity,
+    biometricHelper: BiometricHelper,
+    isBiometricAvailable: Boolean,
     isDarkMode: Boolean = true,
     onToggleDarkMode: (Boolean) -> Unit = {}
 ) {
@@ -62,11 +76,13 @@ fun IoTMonitorApp(
     val dashboardViewModel: DashboardViewModel = viewModel()
     val settingsViewModel: SettingsViewModel = viewModel()
     val adminViewModel: AdminViewModel = viewModel()
+    val notificationSettingsViewModel: NotificationSettingsViewModel = viewModel()
 
     val authState by authViewModel.state.collectAsState()
     val dashboardState by dashboardViewModel.state.collectAsState()
     val settingsState by settingsViewModel.state.collectAsState()
     val adminState by adminViewModel.state.collectAsState()
+    val notificationSettingsState by notificationSettingsViewModel.state.collectAsState()
 
     var showClaimDialog by remember { mutableStateOf(false) }
 
@@ -99,11 +115,32 @@ fun IoTMonitorApp(
             AuthScreen(
                 state = authState,
                 onLogin = { email, password ->
-                    authViewModel.login(email, password)
+                    authViewModel.login(email, password, saveForBiometric = authState.biometricEnabled)
                 },
                 onRegister = { username, email, password ->
                     authViewModel.register(username, email, password)
                 },
+                onBiometricLogin = {
+                    biometricHelper.authenticate(
+                        activity = activity,
+                        title = "Biometric Login",
+                        subtitle = "Use your fingerprint or face to log in",
+                        negativeButtonText = "Use Password"
+                    ) { result ->
+                        when (result) {
+                            is BiometricResult.Success -> {
+                                authViewModel.loginWithBiometric()
+                            }
+                            is BiometricResult.Cancelled -> {
+                                // User cancelled, do nothing
+                            }
+                            is BiometricResult.Error -> {
+                                authViewModel.clearError()
+                            }
+                        }
+                    }
+                },
+                showBiometricButton = isBiometricAvailable && authState.hasSavedCredentials,
                 onClearError = { authViewModel.clearError() }
             )
         }
@@ -161,6 +198,8 @@ fun IoTMonitorApp(
                     user = user,
                     state = settingsState,
                     isDarkMode = isDarkMode,
+                    isBiometricEnabled = authState.biometricEnabled,
+                    isBiometricAvailable = isBiometricAvailable,
                     onBack = { navController.popBackStack() },
                     onUpdateProfile = { username, email ->
                         settingsViewModel.updateProfile(username, email) { updatedUser ->
@@ -186,6 +225,33 @@ fun IoTMonitorApp(
                         dashboardViewModel.loadDevices(user.id, user.isAdmin == 1)
                     },
                     onToggleDarkMode = onToggleDarkMode,
+                    onNotificationSettingsClick = {
+                        navController.navigate(Screen.NotificationSettings.route)
+                    },
+                    onToggleBiometric = { enabled ->
+                        if (enabled) {
+                            // First verify biometric works, then enable it
+                            biometricHelper.authenticate(
+                                activity = activity,
+                                title = "Enable Biometric Login",
+                                subtitle = "Verify your biometric to enable this feature",
+                                negativeButtonText = "Cancel"
+                            ) { result ->
+                                when (result) {
+                                    is BiometricResult.Success -> {
+                                        // Biometric verified, enable it
+                                        // Credentials will be saved on next login
+                                        authViewModel.enableBiometric("", "")
+                                    }
+                                    else -> {
+                                        // Cancelled or error, don't enable
+                                    }
+                                }
+                            }
+                        } else {
+                            authViewModel.disableBiometric()
+                        }
+                    },
                     onClearError = { settingsViewModel.clearError() },
                     onClearSuccess = { settingsViewModel.clearSuccessMessage() }
                 )
@@ -219,6 +285,25 @@ fun IoTMonitorApp(
                 readings = dashboardState.history,
                 isLoading = dashboardState.isLoading,
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.NotificationSettings.route) {
+            NotificationSettingsScreen(
+                state = notificationSettingsState,
+                onBack = { navController.popBackStack() },
+                onToggleNotifications = { notificationSettingsViewModel.toggleNotifications(it) },
+                onToggleTempAlerts = { notificationSettingsViewModel.toggleTempAlerts(it) },
+                onUpdateTempThresholds = { high, low ->
+                    notificationSettingsViewModel.updateTempThresholds(high, low)
+                },
+                onToggleHumidityAlerts = { notificationSettingsViewModel.toggleHumidityAlerts(it) },
+                onUpdateHumidityThresholds = { high, low ->
+                    notificationSettingsViewModel.updateHumidityThresholds(high, low)
+                },
+                onToggleNoiseAlerts = { notificationSettingsViewModel.toggleNoiseAlerts(it) },
+                onUpdateNoiseThreshold = { notificationSettingsViewModel.updateNoiseThreshold(it) },
+                onToggleDeviceOfflineAlerts = { notificationSettingsViewModel.toggleDeviceOfflineAlerts(it) }
             )
         }
     }

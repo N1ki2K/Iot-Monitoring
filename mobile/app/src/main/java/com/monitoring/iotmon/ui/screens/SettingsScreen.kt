@@ -24,6 +24,8 @@ fun SettingsScreen(
     user: AuthUser,
     state: SettingsState,
     isDarkMode: Boolean,
+    isBiometricEnabled: Boolean,
+    isBiometricAvailable: Boolean,
     onBack: () -> Unit,
     onUpdateProfile: (username: String, email: String) -> Unit,
     onChangePassword: (current: String, new: String) -> Unit,
@@ -31,6 +33,8 @@ fun SettingsScreen(
     onUpdateDeviceLabel: (controllerId: Int, label: String?) -> Unit,
     onRemoveDevice: (controllerId: Int) -> Unit,
     onToggleDarkMode: (Boolean) -> Unit,
+    onToggleBiometric: (Boolean) -> Unit,
+    onNotificationSettingsClick: () -> Unit,
     onClearError: () -> Unit,
     onClearSuccess: () -> Unit
 ) {
@@ -299,6 +303,94 @@ fun SettingsScreen(
                             )
                         )
                     }
+
+                    // Biometric Login Toggle
+                    if (isBiometricAvailable) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 12.dp),
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Fingerprint,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Biometric Login",
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                    Text(
+                                        text = if (isBiometricEnabled) "Enabled" else "Disabled",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = isBiometricEnabled,
+                                onCheckedChange = onToggleBiometric,
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Notifications Section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Slate800),
+                onClick = onNotificationSettingsClick
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = null,
+                            tint = Cyan500
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Notifications",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Configure alert thresholds",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = "Open",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 

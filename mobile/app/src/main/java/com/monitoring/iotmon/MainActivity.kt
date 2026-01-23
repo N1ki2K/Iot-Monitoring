@@ -3,7 +3,18 @@ package com.monitoring.iotmon
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -22,6 +33,9 @@ import com.monitoring.iotmon.ui.screens.SensorDetailScreen
 import com.monitoring.iotmon.ui.screens.NotificationSettingsScreen
 import com.monitoring.iotmon.ui.screens.SettingsScreen
 import com.monitoring.iotmon.ui.theme.IotMonTheme
+import com.monitoring.iotmon.ui.theme.Cyan500
+import com.monitoring.iotmon.ui.theme.Slate900
+import com.monitoring.iotmon.ui.theme.Slate950
 import com.monitoring.iotmon.ui.viewmodel.AdminViewModel
 import com.monitoring.iotmon.ui.viewmodel.NotificationSettingsViewModel
 import com.monitoring.iotmon.ui.viewmodel.AuthViewModel
@@ -29,14 +43,21 @@ import com.monitoring.iotmon.ui.viewmodel.DashboardViewModel
 import com.monitoring.iotmon.ui.viewmodel.SettingsViewModel
 import com.monitoring.iotmon.util.BiometricHelper
 import com.monitoring.iotmon.util.BiometricResult
+import com.monitoring.iotmon.util.NotificationHelper
 import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
     private lateinit var biometricHelper: BiometricHelper
+    private lateinit var notificationHelper: NotificationHelper
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Ensure notification channel is registered so system settings can enable alerts.
+        notificationHelper = NotificationHelper(applicationContext)
+
+        // Permission will be requested when user enables notifications in settings
 
         val userPreferences = UserPreferences(applicationContext)
         biometricHelper = BiometricHelper(applicationContext)
@@ -44,20 +65,143 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             val isDarkMode by userPreferences.darkModeFlow.collectAsState(initial = true)
+            val biometricEnabled by userPreferences.biometricEnabledFlow.collectAsState(initial = false)
             val coroutineScope = rememberCoroutineScope()
 
-            IotMonTheme(darkTheme = isDarkMode) {
-                IoTMonitorApp(
-                    activity = this,
-                    biometricHelper = biometricHelper,
-                    isBiometricAvailable = isBiometricAvailable,
-                    isDarkMode = isDarkMode,
-                    onToggleDarkMode = { enabled ->
-                        coroutineScope.launch {
-                            userPreferences.setDarkMode(enabled)
+            // Track if app is unlocked (only matters if biometric is enabled)
+            var isAppUnlocked by remember { mutableStateOf(false) }
+            var authError by remember { mutableStateOf<String?>(null) }
+
+            // Auto-prompt biometric when biometric is enabled and app is locked
+            LaunchedEffect(biometricEnabled, isAppUnlocked) {
+                if (biometricEnabled && !isAppUnlocked && isBiometricAvailable) {
+                    biometricHelper.authenticate(
+                        activity = this@MainActivity,
+                        title = "Unlock IoTMon",
+                        subtitle = "Use biometric to access the app",
+                        negativeButtonText = "Cancel"
+                    ) { result ->
+                        when (result) {
+                            is BiometricResult.Success -> {
+                                isAppUnlocked = true
+                                authError = null
+                            }
+                            is BiometricResult.Cancelled -> {
+                                authError = "Authentication cancelled"
+                            }
+                            is BiometricResult.Error -> {
+                                authError = result.message
+                            }
                         }
                     }
+                }
+            }
+
+            IotMonTheme(darkTheme = isDarkMode) {
+                // Show lock screen if biometric is enabled but not unlocked
+                if (biometricEnabled && !isAppUnlocked && isBiometricAvailable) {
+                    BiometricLockScreen(
+                        error = authError,
+                        onUnlock = {
+                            biometricHelper.authenticate(
+                                activity = this@MainActivity,
+                                title = "Unlock IoTMon",
+                                subtitle = "Use biometric to access the app",
+                                negativeButtonText = "Cancel"
+                            ) { result ->
+                                when (result) {
+                                    is BiometricResult.Success -> {
+                                        isAppUnlocked = true
+                                        authError = null
+                                    }
+                                    is BiometricResult.Cancelled -> {
+                                        authError = "Authentication cancelled"
+                                    }
+                                    is BiometricResult.Error -> {
+                                        authError = result.message
+                                    }
+                                }
+                            }
+                        }
+                    )
+                } else {
+                    IoTMonitorApp(
+                        activity = this@MainActivity,
+                        biometricHelper = biometricHelper,
+                        isBiometricAvailable = isBiometricAvailable,
+                        isDarkMode = isDarkMode,
+                        onToggleDarkMode = { enabled ->
+                            coroutineScope.launch {
+                                userPreferences.setDarkMode(enabled)
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BiometricLockScreen(
+    error: String?,
+    onUnlock: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Slate950, Slate900)
                 )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = "Locked",
+                modifier = Modifier.size(80.dp),
+                tint = Cyan500
+            )
+
+            Text(
+                text = "IoTMon is Locked",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+
+            Text(
+                text = "Use biometric authentication to unlock",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            if (error != null) {
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = onUnlock,
+                colors = ButtonDefaults.buttonColors(containerColor = Cyan500)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Fingerprint,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Unlock with Biometric")
             }
         }
     }

@@ -28,6 +28,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.monitoring.iotmon.ui.theme.*
+import com.monitoring.iotmon.util.NotificationHelper
 
 data class NotificationSettingsState(
     val notificationsEnabled: Boolean = false,
@@ -169,7 +170,8 @@ fun NotificationSettingsScreen(
                             checked = state.notificationsEnabled,
                             onCheckedChange = { enabled ->
                                 if (enabled && !hasNotificationPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    // Open app notification settings
+                                    // Ensure channel exists before opening settings
+                                    NotificationHelper.createChannel(context)
                                     Toast.makeText(context, "Please enable notifications in settings", Toast.LENGTH_SHORT).show()
                                     val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
                                         putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
@@ -192,6 +194,8 @@ fun NotificationSettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
+                                // Ensure channel exists before opening settings
+                                NotificationHelper.createChannel(context)
                                 val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
                                     putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
                                 }

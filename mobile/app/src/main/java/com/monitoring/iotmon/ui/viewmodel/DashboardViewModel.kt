@@ -265,13 +265,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             }
 
             // Check device offline
+            val previousStatus = lastDeviceStatus[deviceId]
             if (settings.deviceOfflineAlerts) {
-                val previousStatus = lastDeviceStatus[deviceId]
                 if (previousStatus == DeviceStatus.ONLINE && status == DeviceStatus.OFFLINE) {
                     notificationHelper.sendDeviceOfflineAlert(deviceLabel, lastSeen ?: "Unknown")
                 }
-                lastDeviceStatus[deviceId] = status
+                if (status == DeviceStatus.ONLINE && previousStatus != DeviceStatus.ONLINE) {
+                    notificationHelper.sendDeviceOnlineAlert(deviceLabel)
+                }
             }
+            lastDeviceStatus[deviceId] = status
         }
     }
 

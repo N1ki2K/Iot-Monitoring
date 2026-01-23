@@ -9,14 +9,14 @@
 - [ ] **Real-time updates** - Live data via WebSocket/MQTT
 
 ### Alerts & Notifications
-- [ ] **Custom thresholds** - Set min/max alerts (e.g., notify if temp > 30°C)
-- [ ] **Push notifications** - Get notified when thresholds are exceeded
+- [x] **Custom thresholds** - Set min/max alerts (e.g., notify if temp > 30°C) ✓
+- [x] **Push notifications** - Get notified when thresholds are exceeded ✓
 
 ### User Experience
 - [x] **QR code scanner** - Scan device QR code to claim instead of typing ✓
-- [ ] **Biometric login** - Fingerprint/face unlock
+- [x] **Biometric login** - Fingerprint/face unlock ✓
 - [x] **Dark/Light theme toggle** ✓
-- [ ] **Home screen widget** - Show current readings without opening app
+- [x] **Home screen widget** - Show current readings without opening app ✓
 
 ### Device Management
 - [x] **Device status** - Show online/offline status, last seen time ✓
@@ -126,8 +126,8 @@
 ### High Impact (More effort but valuable)
 
 **Mobile:**
-1. Push notifications with custom thresholds
-2. QR code scanner for device claiming
+1. ~~Push notifications with custom thresholds~~ ✓ DONE
+2. ~~QR code scanner for device claiming~~ ✓ DONE
 3. Real-time updates via WebSocket
 
 **Web:**
@@ -138,8 +138,8 @@
 ### Future Considerations
 
 **Mobile:**
-1. Home screen widget
-2. Biometric authentication
+1. ~~Home screen widget~~ ✓ DONE
+2. ~~Biometric authentication~~ ✓ DONE
 3. Offline mode with sync
 
 **Web:**

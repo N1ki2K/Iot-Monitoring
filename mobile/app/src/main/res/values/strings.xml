@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">IotMon</string>
+    <string name="widget_name">IoT Sensor Widget</string>
+    <string name="widget_description">Display current sensor readings from your IoT devices</string>
 </resources>

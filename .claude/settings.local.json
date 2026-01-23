@@ -22,7 +22,8 @@
       "Bash(./gradlew compileDebugKotlin)",
       "Bash(systemctl status:*)",
       "Bash(ip addr:*)",
-      "Bash(./gradlew installDebug:*)"
+      "Bash(./gradlew installDebug:*)",
+      "Bash(kill:*)"
     ]
   }
 }

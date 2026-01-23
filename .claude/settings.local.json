@@ -23,7 +23,8 @@
       "Bash(systemctl status:*)",
       "Bash(ip addr:*)",
       "Bash(./gradlew installDebug:*)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "Bash(wc:*)"
     ]
   }
 }

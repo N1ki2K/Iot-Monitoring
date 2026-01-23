@@ -84,13 +84,59 @@ PORT=3000
 
 # Frontend
 VITE_API_URL=http://localhost:3000/api
+
+# Mobile (Moto Hotspot)
+MOBILE_API_URL=http://172.21.129.86:3000/api/
+# MOBILE_API_URL=http://192.168.1.102:3000/api/
 ```
 
-### 2. Start PostgreSQL
+### 2. Start Infrastructure (PostgreSQL + MQTT)
 
-Ensure PostgreSQL is running with the `readings` table created (see `backend/README.md`).
+Choose one:
 
-### 3. Run Backend
+**Option A: Docker Compose (recommended for local dev)**
+
+```bash
+cd infra
+export POSTGRES_DB=iot
+export POSTGRES_USER=iot
+export POSTGRES_PASSWORD=iotpass
+docker compose up -d
+```
+
+This brings up:
+- MQTT broker on `localhost:1883`
+- PostgreSQL on `localhost:5432`
+- Adminer on `http://localhost:8080`
+
+**Option B: Use your own PostgreSQL + Mosquitto**
+
+Make sure PostgreSQL matches the `.env` values and the MQTT broker matches `MQTT_URL`.
+
+### 3. Initialize the Database
+
+Create the database and `readings` table:
+
+```sql
+CREATE DATABASE iot;
+
+\c iot
+
+CREATE TABLE readings (
+  id SERIAL PRIMARY KEY,
+  device_id VARCHAR(64) NOT NULL,
+  ts TIMESTAMP DEFAULT NOW(),
+  temperature_c DECIMAL(5,2),
+  humidity_pct DECIMAL(5,2),
+  lux INTEGER,
+  sound INTEGER,
+  co2_ppm INTEGER
+);
+
+CREATE INDEX idx_readings_device_ts ON readings(device_id, ts DESC);
+```
+
+### 4. Run Backend
 
 ```bash
 cd backend
@@ -106,7 +152,7 @@ npm run ingest
 MQTT_URL=mqtt://broker.hivemq.com:1883 npm run ingest
 ```
 
-### 4. Run Frontend
+### 5. Run Frontend
 
 ```bash
 cd frontend
@@ -116,9 +162,29 @@ npm run dev
 
 Open `http://localhost:5173`
 
-### 5. Start Wokwi Simulation
+### 6. Start Wokwi Simulation
 
 Run the ESP32 simulation on [wokwi.com](https://wokwi.com) or locally.
+
+Update `device/wokwi/config.h` to match your broker:
+- For local Mosquitto: set `MQTT_HOST` to your machine IP on the LAN.
+
+Make sure `MQTT_TOPIC` in `config.h` matches `MQTT_TOPIC` in `.env`.
+
+#### (Optional) Build Wokwi Firmware Locally
+
+The repo already includes prebuilt firmware in `device/wokwi/build/`. If you want to rebuild it:
+
+```bash
+# Install ESP32 core
+arduino-cli core install esp32:esp32
+
+# Install required libraries
+arduino-cli lib install "DHT sensor library" "Adafruit Unified Sensor" "PubSubClient"
+
+# Compile the sketch into device/wokwi/build
+arduino-cli compile --fqbn esp32:esp32:esp32 device/wokwi --output-dir device/wokwi/build
+```
 
 ## Sensors
 

@@ -8,7 +8,22 @@
       "Bash(npm run build:*)",
       "Bash(find:*)",
       "Bash(mvn compile:*)",
-      "Bash(ip -4 addr show:*)"
+      "Bash(ip -4 addr show:*)",
+      "Bash(tree:*)",
+      "Bash(ip route:*)",
+      "Bash(./gradlew assembleDebug:*)",
+      "Bash(adb install:*)",
+      "Bash(adb logcat:*)",
+      "Bash(adb devices:*)",
+      "Bash(lsusb:*)",
+      "Bash(adb kill-server:*)",
+      "Bash(adb start-server:*)",
+      "Bash(./gradlew clean:*)",
+      "Bash(./gradlew compileDebugKotlin)",
+      "Bash(systemctl status:*)",
+      "Bash(ip addr:*)",
+      "Bash(./gradlew installDebug:*)",
+      "Bash(kill:*)"
     ]
   }
 }

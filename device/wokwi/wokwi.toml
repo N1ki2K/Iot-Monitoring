@@ -2,3 +2,7 @@
 version = 1
 firmware = "build/wokwi.ino.bin"
 elf = "build/wokwi.ino.elf"
+
+[[net.forward]]
+from = "localhost:1883"
+to = "localhost:1883"

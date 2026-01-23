@@ -92,7 +92,6 @@
 - [ ] **API documentation page** - Interactive API docs (Swagger)
 - [ ] **Embed widgets** - Generate embeddable charts for other sites
 - [ ] **Webhook configuration** - Set up outgoing webhooks in UI
-- [ ] **Third-party integrations** - Home Assistant, IFTTT, Zapier
 
 ---
 

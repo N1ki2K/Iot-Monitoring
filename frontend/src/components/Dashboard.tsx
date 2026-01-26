@@ -16,7 +16,6 @@ interface DashboardProps {
 
 export function Dashboard({ user, onLogout }: DashboardProps) {
   const navigate = useNavigate();
-  const [devices, setDevices] = useState<string[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>('');
   const [latestReading, setLatestReading] = useState<Reading | null>(null);
   const [history, setHistory] = useState<Reading[]>([]);
@@ -42,7 +41,6 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
           label: assignment.assignment_label || assignment.controller_label,
         }));
         setDeviceOptions(options);
-        setDevices(options.map((option) => option.id));
         if (options.length > 0 && !selectedDevice) {
           setSelectedDevice(options[0].id);
         }
@@ -50,7 +48,6 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       }
 
       const deviceList = await api.getDevices();
-      setDevices(deviceList);
       setDeviceOptions(deviceList.map((device) => ({ id: device })));
       if (deviceList.length > 0 && !selectedDevice) {
         setSelectedDevice(deviceList[0]);

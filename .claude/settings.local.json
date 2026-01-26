@@ -24,7 +24,9 @@
       "Bash(ip addr:*)",
       "Bash(./gradlew installDebug:*)",
       "Bash(kill:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:types:*)"
     ]
   }
 }

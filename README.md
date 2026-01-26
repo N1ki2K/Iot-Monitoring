@@ -56,8 +56,39 @@ Iot-Monitoring/
 │   └── README.md
 │
 ├── docs/                         # Documentation
-├── mobile/                       # Mobile app (future)
-├── packages/                     # Shared packages (future)
+├── mobile/                       # Android app (Kotlin)
+│   ├── app/
+│   │   ├── src/main/
+│   │   │   ├── AndroidManifest.xml
+│   │   │   ├── java/com/monitoring/iotmon/
+│   │   │   │   └── MainActivity.kt
+│   │   │   └── res/
+│   │   │       ├── layout/
+│   │   │       │   └── widget_sensor.xml
+│   │   │       ├── drawable/     # Widget backgrounds + status icons
+│   │   │       ├── mipmap-*/     # Launcher icons
+│   │   │       ├── values/       # Colors, strings, theme
+│   │   │       └── xml/          # Backup + widget metadata
+│   │   ├── build.gradle.kts
+│   │   └── proguard-rules.pro
+│   ├── build.gradle.kts
+│   ├── settings.gradle.kts
+│   ├── gradle.properties
+│   ├── gradle/
+│   │   └── wrapper/
+│   ├── gradlew
+│   └── gradlew.bat
+├── packages/                     # Shared packages
+│   └── shared-types/            # Shared TypeScript types
+│       ├── src/
+│       │   ├── models/
+│       │   │   ├── user.ts      # User types (AuthUser, etc.)
+│       │   │   ├── reading.ts   # Reading types
+│       │   │   ├── controller.ts # Controller types
+│       │   │   └── api.ts       # API response types
+│       │   └── index.ts
+│       ├── package.json
+│       └── tsconfig.json
 └── tools/                        # Utility scripts (future)
 ```
 
@@ -85,9 +116,8 @@ PORT=3000
 # Frontend
 VITE_API_URL=http://localhost:3000/api
 
-# Mobile (Moto Hotspot)
-MOBILE_API_URL=http://172.21.129.86:3000/api/
-# MOBILE_API_URL=http://192.168.1.102:3000/api/
+# Mobile (change to device IP)
+MOBILE_API_URL=http://172.21.129.86:3000/api/ 
 ```
 
 ### 2. Start Infrastructure (PostgreSQL + MQTT)
@@ -136,25 +166,49 @@ CREATE TABLE readings (
 CREATE INDEX idx_readings_device_ts ON readings(device_id, ts DESC);
 ```
 
-### 4. Run Backend
+### 4. Install Dependencies
 
 ```bash
-cd backend
+# From project root - installs all workspaces
 npm install
 
-# Start API server
-npm run api
-
-# Start MQTT ingest (separate terminal)
-npm run ingest
-
-# For Wokwi web (HiveMQ broker)
-MQTT_URL=mqtt://broker.hivemq.com:1883 npm run ingest
+# Build shared types (required first time)
+npm run build:types
 ```
 
-### 5. Run Frontend
+### 5. Run Everything
+
+**Option A: Run all together (from project root)**
 
 ```bash
+# API + Frontend
+npm run dev
+
+# API + MQTT Ingest + Frontend
+npm run dev:all
+```
+
+**Option B: Run individually (from project root)**
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Runs API + Frontend together |
+| `npm run dev:all` | Runs API + MQTT Ingest + Frontend |
+| `npm run dev:api` | Runs only the Backend API |
+| `npm run dev:fe` | Runs only the Frontend |
+| `npm run dev:ingest` | Runs only MQTT Ingest |
+| `npm run build` | Builds shared-types + frontend |
+
+**Option C: Run from individual folders**
+
+```bash
+# Backend (from backend/)
+cd backend
+npm install
+npm run api      # API server
+npm run ingest   # MQTT ingest (separate terminal)
+
+# Frontend (from frontend/)
 cd frontend
 npm install
 npm run dev
@@ -206,3 +260,35 @@ arduino-cli compile --fqbn esp32:esp32:esp32 device/wokwi --output-dir device/wo
 | GET | `/api/readings?page=1&limit=20` | Paginated readings with search |
 
 See `backend/README.md` and `frontend/README.md` for full documentation.
+
+## Mobile App (Android)
+
+The Android app is built with Kotlin and Jetpack Compose.
+
+### Features
+- Real-time sensor dashboard
+- Push notifications with custom thresholds
+- Biometric authentication (fingerprint/face)
+- Home screen widget
+- QR code scanner for device claiming
+- Dark theme
+
+### Build & Run
+
+```bash
+cd mobile
+
+# Build debug APK
+./gradlew assembleDebug
+
+# Install on connected device
+./gradlew installDebug
+
+# Or use Android Studio
+```
+
+The APK will be at `mobile/app/build/outputs/apk/debug/app-debug.apk`
+
+### Configuration
+
+Update `MOBILE_API_URL` in `.env` to point to your backend server's IP address (not localhost, use your machine's LAN IP for physical devices).

@@ -1,61 +1,54 @@
-export interface Reading {
-  id: string;
-  device_id: string;
-  ts: string;
-  temperature_c: string;
-  humidity_pct: string;
-  lux: string;
-  sound: number;
-  co2_ppm: number | null;
-}
+/**
+ * Re-export shared types from @iot-monitoring/shared-types
+ */
+export {
+  // User types
+  type AuthUser,
+  type UserListItem,
+  type LoginRequest,
+  type RegisterRequest,
+  type UpdateProfileRequest,
+  type ChangePasswordRequest,
+  UserRole,
+  UserStatus,
 
-export interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
+  // Reading types
+  type Reading,
+  type LatestReading,
+  type SensorType,
+  type ReadingsQueryParams,
 
-export interface AuthUser {
-  id: number;
-  username: string;
-  email: string;
-  is_admin: number;
-  created_at: string;
-}
+  // Controller types
+  type Controller,
+  type UserControllerAssignment,
+  type ClaimControllerRequest,
+  type CreateControllerRequest,
+  type AssignControllerRequest,
+  type UpdateControllerLabelRequest,
 
-export type UserListItem = AuthUser;
+  // API types
+  type PaginatedResponse,
+  type ApiError,
+  type ApiSuccess,
+  type SortOrder,
+  type PaginationParams,
+} from '@iot-monitoring/shared-types';
 
-export interface UserControllerAssignment {
-  user_id: number;
-  controller_id: number;
-  device_id: string;
-  controller_label?: string | null;
-  assignment_label?: string | null;
-  pairing_code?: string | null;
-  created_at: string;
-}
+/**
+ * Frontend-specific types (not shared with backend)
+ */
 
-export interface Controller {
-  id: number;
-  device_id: string;
-  label?: string | null;
-  pairing_code: string | null;
-  created_at: string;
-}
-
-export type SensorType = 'temperature' | 'humidity' | 'light' | 'sound' | 'air';
-
+/**
+ * Sensor configuration for UI display
+ * This includes React-specific properties like getValue function
+ */
 export interface SensorConfig {
-  type: SensorType;
+  type: 'temperature' | 'humidity' | 'light' | 'sound' | 'air';
   label: string;
   unit: string;
   color: string;
   glowClass: string;
   icon: string;
-  getValue: (reading: Reading) => number;
+  getValue: (reading: import('@iot-monitoring/shared-types').Reading) => number;
   format: (value: number) => string;
 }

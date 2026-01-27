@@ -173,7 +173,7 @@ class IoTRepositoryTest {
     @Test
     fun getReadingsReturnsPagination() = runTest {
         val page = PaginatedResponse(
-            data = emptyList(),
+            data = emptyList<Reading>(),
             pagination = Pagination(page = 1, limit = 20, total = 0, totalPages = 0)
         )
         fakeApi.getReadingsResponse = Response.success(page)

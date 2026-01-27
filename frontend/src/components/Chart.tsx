@@ -8,7 +8,6 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import type { TooltipProps } from 'recharts';
 import type { Reading } from '../types';
 
 interface ChartProps {
@@ -28,7 +27,19 @@ interface ChartDataPoint {
   [key: string]: string | number;
 }
 
-const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
+interface TooltipEntry {
+  color?: string;
+  name?: string;
+  value?: number | string | null;
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipEntry[];
+  label?: string;
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (!active || !payload || !payload.length) return null;
 
   return (

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
-import type { Express } from "express";
+import type { Express, Request } from "express";
 
 let queryMock: ReturnType<typeof vi.fn>;
 
@@ -12,7 +12,7 @@ vi.mock("pg", () => ({
 
 const loadApi = async () => {
   process.env.NODE_ENV = "test";
-  return await import("./api");
+  return await import("./api.js");
 };
 
 const adminRow = {
@@ -37,9 +37,7 @@ describe("api endpoints", () => {
   let verifyPassword: (password: string, storedHash: string) => Promise<boolean>;
   let generatePairingCode: () => Promise<string>;
   let ensureAdmin: (user: { is_admin: number } | null) => boolean;
-  let getRequester: (
-    req: { header: (name: string) => string | undefined }
-  ) => Promise<{ id: number; is_admin: number } | null>;
+  let getRequester: (req: Request) => Promise<{ id: number; is_admin: number } | null>;
 
   beforeEach(async () => {
     queryMock = vi.fn();
@@ -67,14 +65,14 @@ describe("api endpoints", () => {
   });
 
   it("getRequester returns null when header missing", async () => {
-    const req = { header: () => undefined };
+    const req = { header: () => undefined } as unknown as Request;
     expect(await getRequester(req)).toBeNull();
     expect(queryMock).not.toHaveBeenCalled();
   });
 
   it("getRequester returns normalized user", async () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
-    const req = { header: (name: string) => (name === "x-user-id" ? "1" : undefined) };
+    const req = { header: (name: string) => (name === "x-user-id" ? "1" : undefined) } as unknown as Request;
     const user = await getRequester(req);
     expect(user).toMatchObject({
       id: 1,

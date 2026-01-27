@@ -1,6 +1,7 @@
 package com.monitoring.iotmon.data.repository
 
 import com.monitoring.iotmon.data.api.ApiClient
+import com.monitoring.iotmon.data.api.ApiService
 import com.monitoring.iotmon.data.models.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -10,9 +11,7 @@ sealed class Result<out T> {
     data class Error(val message: String) : Result<Nothing>()
 }
 
-class IoTRepository {
-
-    private val api = ApiClient.apiService
+class IoTRepository(private val api: ApiService = ApiClient.apiService) {
 
     // Authentication
     suspend fun login(email: String, password: String): Result<AuthUser> = withContext(Dispatchers.IO) {

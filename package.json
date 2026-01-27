@@ -1,0 +1,25 @@
+{
+  "name": "iot-monitoring",
+  "version": "1.0.0",
+  "private": true,
+  "description": "IoT Monitoring System - Monorepo",
+  "workspaces": [
+    "packages/*",
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n API,FE -c blue,green \"npm run dev:api\" \"npm run dev:fe\"",
+    "dev:all": "concurrently -n API,MQTT,FE -c blue,yellow,green \"npm run dev:api\" \"npm run dev:ingest\" \"npm run dev:fe\"",
+    "dev:api": "npm run api -w backend",
+    "dev:ingest": "npm run ingest -w backend",
+    "dev:fe": "npm run dev -w frontend",
+    "build": "npm run build -w @iot-monitoring/shared-types && npm run build -w frontend",
+    "build:types": "npm run build -w @iot-monitoring/shared-types",
+    "build:fe": "npm run build -w frontend",
+    "install:all": "npm install && npm run build:types"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

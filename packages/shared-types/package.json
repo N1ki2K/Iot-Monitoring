@@ -1,0 +1,20 @@
+{
+  "name": "@iot-monitoring/shared-types",
+  "version": "1.0.0",
+  "description": "Shared TypeScript types for IoT Monitoring project",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}

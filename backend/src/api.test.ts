@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
+import type { Express } from "express";
 
 let queryMock: ReturnType<typeof vi.fn>;
 
 vi.mock("pg", () => ({
   Pool: vi.fn(() => ({
-    query: (...args: any[]) => queryMock(...args),
+    query: (...args: unknown[]) => queryMock(...args),
   })),
 }));
 
@@ -31,12 +32,14 @@ const userRow = {
 };
 
 describe("api endpoints", () => {
-  let app: any;
+  let app: Express;
   let hashPassword: (password: string) => Promise<string>;
   let verifyPassword: (password: string, storedHash: string) => Promise<boolean>;
   let generatePairingCode: () => Promise<string>;
   let ensureAdmin: (user: { is_admin: number } | null) => boolean;
-  let getRequester: (req: any) => Promise<any>;
+  let getRequester: (
+    req: { header: (name: string) => string | undefined }
+  ) => Promise<{ id: number; is_admin: number } | null>;
 
   beforeEach(async () => {
     queryMock = vi.fn();
@@ -339,10 +342,12 @@ describe("api endpoints", () => {
         expect(sql).toContain("COUNT(*)");
         return Promise.resolve({ rows: [{ count: "2" }] });
       })
-      .mockImplementationOnce((sql: string, params: any[]) => {
+      .mockImplementationOnce((sql: string, params: unknown[]) => {
         expect(sql).toContain("ORDER BY ts DESC");
-        expect(params[params.length - 2]).toBe(20);
-        expect(params[params.length - 1]).toBe(0);
+        const limit = params[params.length - 2] as number;
+        const offset = params[params.length - 1] as number;
+        expect(limit).toBe(20);
+        expect(offset).toBe(0);
         return Promise.resolve({ rows: [{ id: 1 }, { id: 2 }] });
       });
 

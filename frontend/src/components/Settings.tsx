@@ -10,6 +10,14 @@ interface SettingsProps {
   onLogout: () => void;
 }
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const typed = error as { response?: { data?: { error?: string } } };
+    return typed.response?.data?.error ?? fallback;
+  }
+  return fallback;
+};
+
 export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
   const navigate = useNavigate();
   const [username, setUsername] = useState(user.username);
@@ -48,8 +56,8 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
             assignment.assignment_label || assignment.controller_label || '';
         });
         setLabelEdits(initialLabels);
-      } catch (error: any) {
-        const message = error?.response?.data?.error || 'Failed to load devices.';
+      } catch (error) {
+        const message = getErrorMessage(error, 'Failed to load devices.');
         setAssignmentsError(message);
       } finally {
         setIsLoadingAssignments(false);
@@ -66,8 +74,8 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
       const updated = await api.updateMe({ username, email });
       onUserUpdated(updated);
       setProfileStatus('Profile updated.');
-    } catch (error: any) {
-      const message = error?.response?.data?.error || 'Failed to update profile.';
+    } catch (error) {
+      const message = getErrorMessage(error, 'Failed to update profile.');
       setProfileError(message);
     }
   };
@@ -90,8 +98,8 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (error: any) {
-      const message = error?.response?.data?.error || 'Failed to update password.';
+    } catch (error) {
+      const message = getErrorMessage(error, 'Failed to update password.');
       setPasswordError(message);
     }
   };
@@ -102,8 +110,8 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
       await api.updateUserControllerLabel(user.id, controllerId, labelEdits[controllerId]);
       const data = await api.getUserControllers(user.id);
       setAssignments(data);
-    } catch (error: any) {
-      const message = error?.response?.data?.error || 'Failed to update label.';
+    } catch (error) {
+      const message = getErrorMessage(error, 'Failed to update label.');
       setAssignmentsError(message);
     }
   };
@@ -114,8 +122,8 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
       await api.removeUserController(user.id, controllerId);
       const data = await api.getUserControllers(user.id);
       setAssignments(data);
-    } catch (error: any) {
-      const message = error?.response?.data?.error || 'Failed to remove device.';
+    } catch (error) {
+      const message = getErrorMessage(error, 'Failed to remove device.');
       setAssignmentsError(message);
     }
   };
@@ -125,8 +133,8 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
     try {
       await api.deleteMe();
       onLogout();
-    } catch (error: any) {
-      const message = error?.response?.data?.error || 'Failed to delete account.';
+    } catch (error) {
+      const message = getErrorMessage(error, 'Failed to delete account.');
       setDeleteError(message);
     }
   };

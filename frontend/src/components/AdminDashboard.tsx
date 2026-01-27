@@ -9,6 +9,14 @@ interface AdminDashboardProps {
   onLogout: () => void;
 }
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const typed = error as { response?: { data?: { error?: string } } };
+    return typed.response?.data?.error ?? fallback;
+  }
+  return fallback;
+};
+
 export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserListItem[]>([]);
@@ -34,8 +42,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         if (data.length > 0) {
           setSelectedUserId((current) => current || data[0].id);
         }
-      } catch (error: any) {
-        const message = error?.response?.data?.error || 'Failed to load users.';
+      } catch (error) {
+        const message = getErrorMessage(error, 'Failed to load users.');
         setUsersError(message);
       } finally {
         setIsLoading(false);
@@ -52,8 +60,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         setControllers(data);
         const available = await api.getAvailableDevices();
         setAvailableDevices(available);
-      } catch (error: any) {
-        const message = error?.response?.data?.error || 'Failed to load controllers.';
+      } catch (error) {
+        const message = getErrorMessage(error, 'Failed to load controllers.');
         setControllerError(message);
         setControllers([]);
         setAvailableDevices([]);
@@ -71,8 +79,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       try {
         const data = await api.getUserControllers(selectedUserId);
         setAssignments(data);
-      } catch (error: any) {
-        const message = error?.response?.data?.error || 'Failed to load controllers.';
+      } catch (error) {
+        const message = getErrorMessage(error, 'Failed to load controllers.');
         setAssignError(message);
       }
     };
@@ -91,8 +99,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       const data = await api.getUserControllers(selectedUserId);
       setAssignments(data);
       setControllerId('');
-    } catch (error: any) {
-      const message = error?.response?.data?.error || 'Failed to assign controller.';
+    } catch (error) {
+      const message = getErrorMessage(error, 'Failed to assign controller.');
       setAssignError(message);
     }
   };
@@ -104,8 +112,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       await api.removeUserController(selectedUserId, controller);
       const data = await api.getUserControllers(selectedUserId);
       setAssignments(data);
-    } catch (error: any) {
-      const message = error?.response?.data?.error || 'Failed to remove controller.';
+    } catch (error) {
+      const message = getErrorMessage(error, 'Failed to remove controller.');
       setAssignError(message);
     }
   };
@@ -126,8 +134,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       setControllers(data);
       setNewDeviceId('');
       setNewLabel('');
-    } catch (error: any) {
-      const message = error?.response?.data?.error || 'Failed to create controller.';
+    } catch (error) {
+      const message = getErrorMessage(error, 'Failed to create controller.');
       setControllerError(message);
     }
   };
@@ -141,8 +149,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       if (controllerId === id) {
         setControllerId('');
       }
-    } catch (error: any) {
-      const message = error?.response?.data?.error || 'Failed to delete controller.';
+    } catch (error) {
+      const message = getErrorMessage(error, 'Failed to delete controller.');
       setControllerError(message);
     }
   };

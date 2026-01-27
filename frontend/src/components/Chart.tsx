@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
+import type { TooltipProps } from 'recharts';
 import type { Reading } from '../types';
 
 interface ChartProps {
@@ -27,24 +28,31 @@ interface ChartDataPoint {
   [key: string]: string | number;
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
   if (!active || !payload || !payload.length) return null;
 
   return (
     <div className="bg-slate-800/95 backdrop-blur-sm border border-slate-700/50 rounded-lg p-3 shadow-xl">
       <p className="text-gray-400 text-xs mb-2 font-mono">{label}</p>
-      {payload.map((entry: any, index: number) => (
-        <div key={index} className="flex items-center gap-2 text-sm">
-          <div
-            className="w-2 h-2 rounded-full"
-            style={{ backgroundColor: entry.color }}
-          />
-          <span className="text-gray-300">{entry.name}:</span>
-          <span className="font-mono font-medium" style={{ color: entry.color }}>
-            {typeof entry.value === 'number' ? entry.value.toFixed(1) : entry.value}
-          </span>
-        </div>
-      ))}
+      {payload.map((entry, index) => {
+        const color = entry.color ?? '#94a3b8';
+        const value = entry.value;
+        const displayValue =
+          typeof value === 'number' ? value.toFixed(1) : value ?? '--';
+
+        return (
+          <div key={index} className="flex items-center gap-2 text-sm">
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: color }}
+            />
+            <span className="text-gray-300">{entry.name}:</span>
+            <span className="font-mono font-medium" style={{ color }}>
+              {displayValue}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 };

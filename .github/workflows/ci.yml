@@ -183,9 +183,11 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Validate docker-compose
+        working-directory: infra
         run: docker compose config
 
       - name: Build images (no push)
+        working-directory: infra
         run: docker compose build
 
   # ============================================

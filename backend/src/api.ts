@@ -84,6 +84,14 @@ export const verifyPassword = async (password: string, storedHash: string) => {
   return crypto.timingSafeEqual(storedKey, derivedKey);
 };
 
+const getErrorCode = (error: unknown) => {
+  if (error && typeof error === "object" && "code" in error) {
+    const typed = error as { code?: string };
+    return typed.code;
+  }
+  return undefined;
+};
+
 app.post("/api/auth/register", async (req, res) => {
   const { username, email, password } = req.body ?? {};
   if (!username || !email || !password) {
@@ -99,8 +107,8 @@ app.post("/api/auth/register", async (req, res) => {
       [username, email, passwordHash]
     );
     return res.status(201).json(result.rows[0]);
-  } catch (error: any) {
-    if (error?.code === "23505") {
+  } catch (error) {
+    if (getErrorCode(error) === "23505") {
       return res.status(409).json({ error: "username or email already exists" });
     }
     console.error("Register failed:", error);
@@ -170,8 +178,8 @@ app.patch("/api/me", async (req, res) => {
       [username, email, requester.id]
     );
     return res.json(result.rows[0]);
-  } catch (error: any) {
-    if (error?.code === "23505") {
+  } catch (error) {
+    if (getErrorCode(error) === "23505") {
       return res.status(409).json({ error: "username or email already exists" });
     }
     console.error("Update profile failed:", error);

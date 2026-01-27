@@ -9,6 +9,14 @@ interface AuthProps {
   onAuth: (user: AuthUser) => void;
 }
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const typed = error as { response?: { data?: { error?: string } } };
+    return typed.response?.data?.error ?? fallback;
+  }
+  return fallback;
+};
+
 export function Auth({ onAuth }: AuthProps) {
   const [mode, setMode] = useState<AuthMode>('login');
   const [fullName, setFullName] = useState('');
@@ -68,8 +76,8 @@ export function Auth({ onAuth }: AuthProps) {
         setUser(loggedIn);
         onAuth(loggedIn);
       }
-    } catch (err: any) {
-      const message = err?.response?.data?.error || 'Something went wrong. Please try again.';
+    } catch (err) {
+      const message = getErrorMessage(err, 'Something went wrong. Please try again.');
       setError(message);
     } finally {
       setIsSubmitting(false);

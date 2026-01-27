@@ -23,23 +23,22 @@ const client = mqtt.connect(MQTT_URL);
 client.on("connect", () => {
   console.log("MQTT connected");
   client.subscribe(TOPIC, (err) => {
-  if (err) console.error("Subscribe error:", err);
-  else console.log("Subscribed to", TOPIC);
-});
-;
+    if (err) console.error("Subscribe error:", err);
+    else console.log("Subscribed to", TOPIC);
+  });
 });
 
 client.on("message", async (topic, payload) => {
-    const parts = topic.split("/");
-    const deviceId = parts[1];
+  const parts = topic.split("/");
+  const deviceId = parts[1];
 
-    let msg;
-    try {
-      msg = JSON.parse(payload.toString("utf-8"));
-    } catch (err) {
-      console.warn("Invalid JSON:", payload.toString());
-      return;
-    }
+  let msg;
+  try {
+    msg = JSON.parse(payload.toString("utf-8"));
+  } catch (err) {
+    console.warn("Invalid JSON:", payload.toString());
+    return;
+  }
   // expects: { t, h, lux, sound, co2 }
 
   await pool.query(
@@ -47,7 +46,6 @@ client.on("message", async (topic, payload) => {
      VALUES ($1, $2, $3, $4, $5, $6)`,
     [deviceId, msg.t ?? null, msg.h ?? null, msg.lux ?? null, msg.sound ?? null, msg.aq ?? null]
   );
-  
 
   console.log("inserted", deviceId, msg);
 });

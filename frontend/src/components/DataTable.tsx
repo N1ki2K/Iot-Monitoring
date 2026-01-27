@@ -10,12 +10,12 @@ interface DataTableProps {
 type SortField = 'ts' | 'device_id' | 'temperature_c' | 'humidity_pct' | 'lux' | 'sound' | 'co2_ppm';
 type SortOrder = 'ASC' | 'DESC';
 
-const columns: Array<{ key: SortField; label: string; format?: (val: any) => string }> = [
-  { key: 'ts', label: 'Timestamp', format: (val) => new Date(val).toLocaleString() },
+const columns: Array<{ key: SortField; label: string; format?: (val: unknown) => string }> = [
+  { key: 'ts', label: 'Timestamp', format: (val) => new Date(String(val)).toLocaleString() },
   { key: 'device_id', label: 'Device' },
-  { key: 'temperature_c', label: 'Temp (°C)', format: (val) => parseFloat(val).toFixed(1) },
-  { key: 'humidity_pct', label: 'Humidity (%)', format: (val) => parseFloat(val).toFixed(1) },
-  { key: 'lux', label: 'Light (lux)', format: (val) => parseFloat(val).toFixed(0) },
+  { key: 'temperature_c', label: 'Temp (°C)', format: (val) => Number.parseFloat(String(val)).toFixed(1) },
+  { key: 'humidity_pct', label: 'Humidity (%)', format: (val) => Number.parseFloat(String(val)).toFixed(1) },
+  { key: 'lux', label: 'Light (lux)', format: (val) => Number.parseFloat(String(val)).toFixed(0) },
   { key: 'sound', label: 'Sound', format: (val) => val?.toString() || '0' },
   { key: 'co2_ppm', label: 'Air Quality', format: (val) => val?.toString() || '-' },
 ];

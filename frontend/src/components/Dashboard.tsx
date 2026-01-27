@@ -14,6 +14,14 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const typed = error as { response?: { data?: { error?: string } } };
+    return typed.response?.data?.error ?? fallback;
+  }
+  return fallback;
+};
+
 export function Dashboard({ user, onLogout }: DashboardProps) {
   const navigate = useNavigate();
   const [selectedDevice, setSelectedDevice] = useState<string>('');
@@ -122,8 +130,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       setClaimLabel('');
       setShowClaimModal(false);
       await loadDevices();
-    } catch (error: any) {
-      const message = error?.response?.data?.error || 'Failed to claim controller.';
+    } catch (error) {
+      const message = getErrorMessage(error, 'Failed to claim controller.');
       setClaimError(message);
     } finally {
       setIsClaiming(false);

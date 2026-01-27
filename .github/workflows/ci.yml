@@ -1,0 +1,212 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, 'feature/**', 'Imlement-Shared-Types']
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # ============================================
+  # Shared Types Package
+  # ============================================
+  shared-types:
+    name: Shared Types
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: packages/shared-types/package-lock.json
+
+      - name: Install dependencies
+        working-directory: packages/shared-types
+        run: npm ci
+
+      - name: Type check
+        working-directory: packages/shared-types
+        run: npm run typecheck
+
+      - name: Build
+        working-directory: packages/shared-types
+        run: npm run build
+
+  # ============================================
+  # Frontend
+  # ============================================
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    needs: shared-types
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install shared-types dependencies
+        working-directory: packages/shared-types
+        run: npm ci
+
+      - name: Build shared-types
+        working-directory: packages/shared-types
+        run: npm run build
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type check
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Unit tests
+        working-directory: frontend
+        run: npm run test:ci
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  # ============================================
+  # Backend
+  # ============================================
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    needs: shared-types
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install shared-types dependencies
+        working-directory: packages/shared-types
+        run: npm ci
+
+      - name: Build shared-types
+        working-directory: packages/shared-types
+        run: npm run build
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Lint
+        working-directory: backend
+        run: npm run lint
+
+      - name: Type check
+        working-directory: backend
+        run: npm run typecheck
+
+      - name: Unit tests
+        working-directory: backend
+        run: npm run test:ci
+
+      - name: Build
+        working-directory: backend
+        run: npm run build
+
+  # ============================================
+  # Mobile App (Android)
+  # ============================================
+  mobile:
+    name: Mobile (Android)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Create dummy .env file
+        run: echo "MOBILE_API_URL=http://localhost:3000/api/" > .env
+
+      - name: Lint
+        working-directory: mobile
+        run: ./gradlew lint
+
+      - name: Unit tests
+        working-directory: mobile
+        run: ./gradlew test
+
+      - name: Build debug APK
+        working-directory: mobile
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: mobile/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+
+  # ============================================
+  # Docker Build Validation
+  # ============================================
+  docker:
+    name: Docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate docker-compose
+        working-directory: infra
+        run: docker compose config
+
+      - name: Build images (no push)
+        working-directory: infra
+        run: docker compose build
+
+  # ============================================
+  # Summary Job
+  # ============================================
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [shared-types, frontend, backend, mobile, docker]
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [[ "${{ needs.shared-types.result }}" != "success" ]] || \
+             [[ "${{ needs.frontend.result }}" != "success" ]] || \
+             [[ "${{ needs.backend.result }}" != "success" ]] || \
+             [[ "${{ needs.mobile.result }}" != "success" ]] || \
+             [[ "${{ needs.docker.result }}" != "success" ]]; then
+            echo "One or more jobs failed"
+            exit 1
+          fi
+          echo "All CI jobs passed!"

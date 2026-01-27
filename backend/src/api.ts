@@ -9,7 +9,7 @@ import express from "express";
 import cors from "cors";
 import { Pool } from "pg";
 
-const app = express();
+export const app = express();
 app.use(cors());
 app.use(express.json());
 
@@ -21,7 +21,7 @@ const pool = new Pool({
   database: process.env.PGDATABASE,
 });
 
-const getRequester = async (req: express.Request) => {
+export const getRequester = async (req: express.Request) => {
   const requesterId = Number(req.header("x-user-id"));
   if (!requesterId) return null;
   const result = await pool.query(
@@ -37,14 +37,14 @@ const getRequester = async (req: express.Request) => {
   };
 };
 
-const ensureAdmin = (user: { is_admin: number } | null) => {
+export const ensureAdmin = (user: { is_admin: number } | null) => {
   if (!user || user.is_admin !== 1) {
     return false;
   }
   return true;
 };
 
-const generatePairingCode = async () => {
+export const generatePairingCode = async () => {
   for (let attempt = 0; attempt < 10; attempt++) {
     const code = String(Math.floor(Math.random() * 100000)).padStart(5, "0");
     const exists = await pool.query(
@@ -66,13 +66,13 @@ const scryptAsync = (password: string, salt: Buffer) =>
     });
   });
 
-const hashPassword = async (password: string) => {
+export const hashPassword = async (password: string) => {
   const salt = crypto.randomBytes(16);
   const derivedKey = await scryptAsync(password, salt);
   return `scrypt$${salt.toString("hex")}$${derivedKey.toString("hex")}`;
 };
 
-const verifyPassword = async (password: string, storedHash: string) => {
+export const verifyPassword = async (password: string, storedHash: string) => {
   const [scheme, saltHex, hashHex] = storedHash.split("$");
   if (scheme !== "scrypt" || !saltHex || !hashHex) {
     return false;
@@ -82,6 +82,14 @@ const verifyPassword = async (password: string, storedHash: string) => {
   const storedKey = Buffer.from(hashHex, "hex");
   if (storedKey.length !== derivedKey.length) return false;
   return crypto.timingSafeEqual(storedKey, derivedKey);
+};
+
+const getErrorCode = (error: unknown) => {
+  if (error && typeof error === "object" && "code" in error) {
+    const typed = error as { code?: string };
+    return typed.code;
+  }
+  return undefined;
 };
 
 app.post("/api/auth/register", async (req, res) => {
@@ -99,8 +107,8 @@ app.post("/api/auth/register", async (req, res) => {
       [username, email, passwordHash]
     );
     return res.status(201).json(result.rows[0]);
-  } catch (error: any) {
-    if (error?.code === "23505") {
+  } catch (error) {
+    if (getErrorCode(error) === "23505") {
       return res.status(409).json({ error: "username or email already exists" });
     }
     console.error("Register failed:", error);
@@ -170,8 +178,8 @@ app.patch("/api/me", async (req, res) => {
       [username, email, requester.id]
     );
     return res.json(result.rows[0]);
-  } catch (error: any) {
-    if (error?.code === "23505") {
+  } catch (error) {
+    if (getErrorCode(error) === "23505") {
       return res.status(409).json({ error: "username or email already exists" });
     }
     console.error("Update profile failed:", error);
@@ -726,7 +734,13 @@ app.delete("/api/users/:userId/controllers", async (req, res) => {
     });
   });
 
+export const startServer = () => {
   const PORT = process.env.PORT ?? 3000;
   app.listen(PORT, () => {
     console.log(`API running on http://localhost:${PORT}`);
   });
+};
+
+if (process.env.NODE_ENV !== "test") {
+  startServer();
+}

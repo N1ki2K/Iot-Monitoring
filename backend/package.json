@@ -4,7 +4,12 @@
   "type": "module",
   "scripts": {
     "ingest": "ts-node src/ingest.ts",
-    "api": "ts-node src/api.ts"
+    "api": "ts-node src/api.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "test": "vitest",
+    "test:ci": "vitest run --coverage"
   },
   "dependencies": {
     "@iot-monitoring/shared-types": "file:../packages/shared-types",
@@ -19,8 +24,15 @@
     "@types/express": "^5.0.6",
     "@types/node": "^20.11.0",
     "@types/pg": "^8.16.0",
+    "@types/supertest": "^6.0.2",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vitest/coverage-v8": "^2.1.8",
+    "eslint": "^8.57.0",
+    "supertest": "^6.3.4",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "vitest": "^2.1.8"
   }
 }

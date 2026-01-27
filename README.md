@@ -145,7 +145,17 @@ Make sure PostgreSQL matches the `.env` values and the MQTT broker matches `MQTT
 
 ### 3. Initialize the Database
 
-Create the database and `readings` table:
+Open Adminer at `http://localhost:8080` and login with:
+
+| Field    | Value      |
+|----------|------------|
+| System   | PostgreSQL |
+| Server   | `db`       |
+| Username | `iot`      |
+| Password | `iotpass`  |
+| Database | `iot`      |
+
+Click "SQL command" and run the following to create the `readings` table:
 
 ```sql
 CREATE DATABASE iot;
@@ -190,14 +200,14 @@ npm run dev:all
 
 **Option B: Run individually (from project root)**
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Runs API + Frontend together |
-| `npm run dev:all` | Runs API + MQTT Ingest + Frontend |
-| `npm run dev:api` | Runs only the Backend API |
-| `npm run dev:fe` | Runs only the Frontend |
-| `npm run dev:ingest` | Runs only MQTT Ingest |
-| `npm run build` | Builds shared-types + frontend |
+| Command              | Description                       |
+|----------------------|-----------------------------------|
+| `npm run dev`        | Runs API + Frontend together      |
+| `npm run dev:all`    | Runs API + MQTT Ingest + Frontend |
+| `npm run dev:api`    | Runs only the Backend API         |
+| `npm run dev:fe`     | Runs only the Frontend            |
+| `npm run dev:ingest` | Runs only MQTT Ingest             |
+| `npm run build`      | Builds shared-types + frontend    |
 
 **Option C: Run from individual folders**
 
@@ -252,12 +262,12 @@ arduino-cli compile --fqbn esp32:esp32:esp32 device/wokwi --output-dir device/wo
 
 ## API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/devices` | List all devices |
-| GET | `/api/latest/:deviceId` | Latest reading |
-| GET | `/api/history/:deviceId?hours=24` | Historical readings |
-| GET | `/api/readings?page=1&limit=20` | Paginated readings with search |
+| Method | Endpoint                          | Description                    |
+|--------|-----------------------------------|--------------------------------|
+| GET    | `/api/devices`                    | List all devices               |
+| GET    | `/api/latest/:deviceId`           | Latest reading                 |
+| GET    | `/api/history/:deviceId?hours=24` | Historical readings            |
+| GET    | `/api/readings?page=1&limit=20`   | Paginated readings with search |
 
 See `backend/README.md` and `frontend/README.md` for full documentation.
 

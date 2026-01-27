@@ -38,7 +38,6 @@
 - [ ] **Advanced charts** - Zoom, pan, multiple time ranges overlay
 - [ ] **Heatmaps** - Visualize data patterns over time (hour/day matrix)
 - [ ] **Gauge widgets** - Circular gauges for current values
-- [ ] **Map view** - Show devices on a floor plan or map
 
 ### Data Management
 - [ ] **Date range picker** - Custom date range for historical data

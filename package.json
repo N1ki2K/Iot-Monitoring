@@ -17,7 +17,8 @@
     "build": "npm run build -w @iot-monitoring/shared-types && npm run build -w frontend",
     "build:types": "npm run build -w @iot-monitoring/shared-types",
     "build:fe": "npm run build -w frontend",
-    "install:all": "npm install && npm run build:types"
+    "install:all": "npm install && npm run build:types",
+    "test:all": "concurrently -n BACKEND,FRONTEND,MOBILE -c blue,green,magenta \"npm run test:ci -w backend\" \"npm run test:ci -w frontend\" \"cd mobile && ./gradlew test\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

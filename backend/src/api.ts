@@ -21,11 +21,15 @@ const pool = new Pool({
   database: process.env.PGDATABASE,
 });
 
+const normalizeFlag = (value: unknown) => value === true || value === 1 || value === "1";
+
 export const getRequester = async (req: express.Request) => {
   const requesterId = Number(req.header("x-user-id"));
   if (!requesterId) return null;
   const result = await pool.query(
-    `SELECT id, username, email, is_admin, created_at FROM users WHERE id = $1`,
+    `SELECT id, username, email, role, is_admin, is_dev, created_at
+     FROM users
+     WHERE id = $1`,
     [requesterId]
   );
   const row = result.rows[0];
@@ -33,16 +37,24 @@ export const getRequester = async (req: express.Request) => {
   return {
     ...row,
     id: Number(row.id),
-    is_admin: Number(row.is_admin),
+    is_admin: normalizeFlag(row.is_admin) ? 1 : 0,
+    is_dev: normalizeFlag(row.is_dev) ? 1 : 0,
   };
 };
 
-export const ensureAdmin = (user: { is_admin: number } | null) => {
-  if (!user || user.is_admin !== 1) {
-    return false;
-  }
-  return true;
-};
+export const ensureAdmin = (
+  user: { role?: string; is_admin?: number; is_dev?: number } | null
+) =>
+  Boolean(
+    user &&
+      (user.role === "admin" ||
+        user.role === "dev" ||
+        user.is_admin === 1 ||
+        user.is_dev === 1)
+  );
+
+export const ensureDev = (user: { role?: string; is_dev?: number } | null) =>
+  Boolean(user && (user.role === "dev" || user.is_dev === 1));
 
 export const generatePairingCode = async () => {
   for (let attempt = 0; attempt < 10; attempt++) {
@@ -65,6 +77,41 @@ const scryptAsync = (password: string, salt: Buffer) =>
       else resolve(derivedKey as Buffer);
     });
   });
+
+const logAudit = async ({
+  req,
+  actor,
+  action,
+  entityType,
+  entityId,
+  metadata,
+}: {
+  req: express.Request;
+  actor: { id: number; email: string } | null;
+  action: string;
+  entityType: string;
+  entityId?: string | number | null;
+  metadata?: Record<string, unknown>;
+}) => {
+  try {
+    await pool.query(
+      `INSERT INTO audit_logs (actor_id, actor_email, action, entity_type, entity_id, metadata, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        actor?.id ?? null,
+        actor?.email ?? null,
+        action,
+        entityType,
+        entityId ? String(entityId) : null,
+        metadata ? JSON.stringify(metadata) : null,
+        req.ip ?? null,
+        req.header("user-agent") ?? null,
+      ]
+    );
+  } catch (error) {
+    console.error("Audit log failed:", error);
+  }
+};
 
 export const hashPassword = async (password: string) => {
   const salt = crypto.randomBytes(16);
@@ -101,12 +148,25 @@ app.post("/api/auth/register", async (req, res) => {
   try {
     const passwordHash = await hashPassword(password);
     const result = await pool.query(
-      `INSERT INTO users (username, email, password)
-       VALUES ($1, $2, $3)
-       RETURNING id, username, email, is_admin, created_at`,
+      `INSERT INTO users (username, email, password, role)
+       VALUES ($1, $2, $3, 'user')
+       RETURNING id, username, email, role, is_admin, is_dev, created_at`,
       [username, email, passwordHash]
     );
-    return res.status(201).json(result.rows[0]);
+    const created = result.rows[0];
+    const response = {
+      ...created,
+      is_admin: normalizeFlag(created.is_admin) ? 1 : 0,
+      is_dev: normalizeFlag(created.is_dev) ? 1 : 0,
+    };
+    await logAudit({
+      req,
+      actor: { id: created.id, email: created.email },
+      action: "user.register",
+      entityType: "user",
+      entityId: created.id,
+    });
+    return res.status(201).json(response);
   } catch (error) {
     if (getErrorCode(error) === "23505") {
       return res.status(409).json({ error: "username or email already exists" });
@@ -124,7 +184,7 @@ app.post("/api/auth/login", async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, username, email, password, is_admin, created_at
+      `SELECT id, username, email, password, role, is_admin, is_dev, created_at
        FROM users
        WHERE email = $1`,
       [email]
@@ -138,13 +198,23 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(401).json({ error: "invalid credentials" });
     }
 
-    return res.json({
+    const response = {
       id: user.id,
       username: user.username,
       email: user.email,
-      is_admin: user.is_admin,
+      role: user.role,
+      is_admin: normalizeFlag(user.is_admin) ? 1 : 0,
+      is_dev: normalizeFlag(user.is_dev) ? 1 : 0,
       created_at: user.created_at,
+    };
+    await logAudit({
+      req,
+      actor: { id: user.id, email: user.email },
+      action: "user.login",
+      entityType: "user",
+      entityId: user.id,
     });
+    return res.json(response);
   } catch (error) {
     console.error("Login failed:", error);
     return res.status(500).json({ error: "failed to login" });
@@ -174,10 +244,24 @@ app.patch("/api/me", async (req, res) => {
       `UPDATE users
        SET username = $1, email = $2
        WHERE id = $3
-       RETURNING id, username, email, is_admin, created_at`,
+       RETURNING id, username, email, role, is_admin, is_dev, created_at`,
       [username, email, requester.id]
     );
-    return res.json(result.rows[0]);
+    const updated = result.rows[0];
+    const response = {
+      ...updated,
+      is_admin: normalizeFlag(updated.is_admin) ? 1 : 0,
+      is_dev: normalizeFlag(updated.is_dev) ? 1 : 0,
+    };
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "user.update_profile",
+      entityType: "user",
+      entityId: requester.id,
+      metadata: { username, email },
+    });
+    return res.json(response);
   } catch (error) {
     if (getErrorCode(error) === "23505") {
       return res.status(409).json({ error: "username or email already exists" });
@@ -215,6 +299,13 @@ app.patch("/api/me/password", async (req, res) => {
       `UPDATE users SET password = $1 WHERE id = $2`,
       [passwordHash, requester.id]
     );
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "user.update_password",
+      entityType: "user",
+      entityId: requester.id,
+    });
     return res.status(204).send();
   } catch (error) {
     console.error("Update password failed:", error);
@@ -230,6 +321,13 @@ app.delete("/api/me", async (req, res) => {
 
   try {
     await pool.query(`DELETE FROM users WHERE id = $1`, [requester.id]);
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "user.delete",
+      entityType: "user",
+      entityId: requester.id,
+    });
     return res.status(204).send();
   } catch (error) {
     console.error("Delete account failed:", error);
@@ -249,12 +347,166 @@ app.get("/api/users", async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT id, username, email, is_admin, created_at FROM users ORDER BY created_at DESC`
+      `SELECT id, username, email, role, is_admin, is_dev, created_at
+       FROM users
+       ORDER BY created_at DESC`
     );
-    return res.json(result.rows);
+    const response = result.rows.map((row) => ({
+      ...row,
+      is_admin: normalizeFlag(row.is_admin) ? 1 : 0,
+      is_dev: normalizeFlag(row.is_dev) ? 1 : 0,
+    }));
+    return res.json(response);
   } catch (error) {
     console.error("Fetch users failed:", error);
     return res.status(500).json({ error: "failed to fetch users" });
+  }
+});
+
+app.patch("/api/users/:userId/role", async (req, res) => {
+  const requester = await getRequester(req);
+  const userId = Number(req.params.userId);
+  const { role } = req.body ?? {};
+  if (!requester || !userId) {
+    return res.status(400).json({ error: "invalid user id" });
+  }
+  if (!ensureDev(requester)) {
+    return res.status(403).json({ error: "dev access required" });
+  }
+  if (!["user", "admin", "dev"].includes(role)) {
+    return res.status(400).json({ error: "invalid role" });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE users
+       SET role = $1
+       WHERE id = $2
+       RETURNING id, username, email, role, is_admin, is_dev, created_at`,
+      [role, userId]
+    );
+    const updated = result.rows[0];
+    if (!updated) {
+      return res.status(404).json({ error: "user not found" });
+    }
+    const response = {
+      ...updated,
+      is_admin: normalizeFlag(updated.is_admin) ? 1 : 0,
+      is_dev: normalizeFlag(updated.is_dev) ? 1 : 0,
+    };
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "user.update_role",
+      entityType: "user",
+      entityId: userId,
+      metadata: { role },
+    });
+    return res.json(response);
+  } catch (error) {
+    console.error("Update role failed:", error);
+    return res.status(500).json({ error: "failed to update role" });
+  }
+});
+
+app.get("/api/audit", async (req, res) => {
+  const requester = await getRequester(req);
+  if (!requester || !ensureAdmin(requester)) {
+    return res.status(403).json({ error: "admin access required" });
+  }
+
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+  const offset = (page - 1) * limit;
+  const actorId = Number(req.query.actorId) || null;
+  const action = (req.query.action as string) || "";
+  const entityType = (req.query.entityType as string) || "";
+  const entityId = (req.query.entityId as string) || "";
+
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+  let paramIndex = 1;
+
+  if (actorId) {
+    conditions.push(`actor_id = $${paramIndex}`);
+    params.push(actorId);
+    paramIndex++;
+  }
+  if (action) {
+    conditions.push(`action = $${paramIndex}`);
+    params.push(action);
+    paramIndex++;
+  }
+  if (entityType) {
+    conditions.push(`entity_type = $${paramIndex}`);
+    params.push(entityType);
+    paramIndex++;
+  }
+  if (entityId) {
+    conditions.push(`entity_id = $${paramIndex}`);
+    params.push(entityId);
+    paramIndex++;
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  try {
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM audit_logs ${whereClause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    const dataResult = await pool.query(
+      `SELECT * FROM audit_logs ${whereClause} ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...params, limit, offset]
+    );
+
+    return res.json({
+      data: dataResult.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Fetch audit logs failed:", error);
+    return res.status(500).json({ error: "failed to fetch audit logs" });
+  }
+});
+
+app.delete("/api/audit", async (req, res) => {
+  const requester = await getRequester(req);
+  if (!requester || !ensureDev(requester)) {
+    return res.status(403).json({ error: "dev access required" });
+  }
+
+  const before = req.query.before as string | undefined;
+  const all = req.query.all === "true";
+
+  if (!before && !all) {
+    return res.status(400).json({ error: "before or all=true required" });
+  }
+
+  try {
+    if (all) {
+      await pool.query(`DELETE FROM audit_logs`);
+    } else {
+      await pool.query(`DELETE FROM audit_logs WHERE created_at < $1`, [before]);
+    }
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "audit.purge",
+      entityType: "audit_log",
+      entityId: all ? "all" : before ?? null,
+    });
+    return res.status(204).send();
+  } catch (error) {
+    console.error("Purge audit logs failed:", error);
+    return res.status(500).json({ error: "failed to purge audit logs" });
   }
 });
 
@@ -315,7 +567,16 @@ app.post("/api/controllers", async (req, res) => {
        RETURNING id, device_id, label, pairing_code, created_at`,
       [deviceId, label ?? null, pairingCode]
     );
-    return res.status(201).json(result.rows[0]);
+    const controller = result.rows[0];
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "controller.create",
+      entityType: "controller",
+      entityId: controller.id,
+      metadata: { deviceId, label: label ?? null },
+    });
+    return res.status(201).json(controller);
   } catch (error) {
     console.error("Create controller failed:", error);
     return res.status(500).json({ error: "failed to create controller" });
@@ -354,6 +615,14 @@ app.post("/api/controllers/claim", async (req, res) => {
          SET label = COALESCE(EXCLUDED.label, user_controllers.label)`,
       [requester.id, controller.id, label ?? null]
     );
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "controller.claim",
+      entityType: "controller",
+      entityId: controller.id,
+      metadata: { deviceId: controller.device_id, label: label ?? null },
+    });
 
     return res.json({
       controller,
@@ -376,6 +645,13 @@ app.delete("/api/controllers/:controllerId", async (req, res) => {
 
   try {
     await pool.query(`DELETE FROM controllers WHERE id = $1`, [controllerId]);
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "controller.delete",
+      entityType: "controller",
+      entityId: controllerId,
+    });
     return res.status(204).send();
   } catch (error) {
     console.error("Delete controller failed:", error);
@@ -436,6 +712,14 @@ app.post("/api/users/:userId/controllers", async (req, res) => {
        RETURNING user_id, controller_id, created_at`,
       [userId, controllerId, label ?? null]
     );
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "user_controller.assign",
+      entityType: "user_controller",
+      entityId: `${userId}:${controllerId}`,
+      metadata: { userId, controllerId, label: label ?? null },
+    });
     return res.status(201).json(result.rows[0] ?? null);
   } catch (error) {
     console.error("Assign controller failed:", error);
@@ -466,6 +750,14 @@ app.patch("/api/users/:userId/controllers/:controllerId", async (req, res) => {
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "assignment not found" });
     }
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "user_controller.update_label",
+      entityType: "user_controller",
+      entityId: `${userId}:${controllerId}`,
+      metadata: { userId, controllerId, label: label ?? null },
+    });
     return res.json(result.rows[0]);
   } catch (error) {
     console.error("Update controller label failed:", error);
@@ -489,6 +781,14 @@ app.delete("/api/users/:userId/controllers", async (req, res) => {
       `DELETE FROM user_controllers WHERE user_id = $1 AND controller_id = $2`,
       [userId, controllerId]
     );
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "user_controller.remove",
+      entityType: "user_controller",
+      entityId: `${userId}:${controllerId}`,
+      metadata: { userId, controllerId },
+    });
     return res.status(204).send();
   } catch (error) {
     console.error("Remove controller failed:", error);
@@ -499,7 +799,7 @@ app.delete("/api/users/:userId/controllers", async (req, res) => {
   // List all devices
   app.get("/api/devices", async (req, res) => {
     const requester = await getRequester(req);
-    if (requester && requester.is_admin !== 1) {
+    if (requester && !ensureAdmin(requester)) {
       const result = await pool.query(
         `SELECT DISTINCT c.device_id
          FROM user_controllers uc
@@ -521,7 +821,7 @@ app.delete("/api/users/:userId/controllers", async (req, res) => {
   app.get("/api/latest/:deviceId", async (req, res) => {
     const { deviceId } = req.params;
     const requester = await getRequester(req);
-    if (requester && requester.is_admin !== 1) {
+    if (requester && !ensureAdmin(requester)) {
       const accessCheck = await pool.query(
         `SELECT 1
          FROM user_controllers uc
@@ -548,7 +848,7 @@ app.delete("/api/users/:userId/controllers", async (req, res) => {
     const { deviceId } = req.params;
     const hours = Number(req.query.hours) || 24;
     const requester = await getRequester(req);
-    if (requester && requester.is_admin !== 1) {
+    if (requester && !ensureAdmin(requester)) {
       const accessCheck = await pool.query(
         `SELECT 1
          FROM user_controllers uc
@@ -590,7 +890,7 @@ app.delete("/api/users/:userId/controllers", async (req, res) => {
     const params: (string | number)[] = [];
     let paramIndex = 1;
 
-    if (requester && requester.is_admin !== 1) {
+    if (requester && !ensureAdmin(requester)) {
       if (device) {
         const accessCheck = await pool.query(
           `SELECT 1

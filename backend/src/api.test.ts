@@ -19,7 +19,7 @@ const adminRow = {
   id: 1,
   username: "Admin",
   email: "admin@example.com",
-  is_admin: 1,
+  role: "admin",
   created_at: "2024-01-01",
 };
 
@@ -27,7 +27,7 @@ const userRow = {
   id: 2,
   username: "User",
   email: "user@example.com",
-  is_admin: 0,
+  role: "user",
   created_at: "2024-01-02",
 };
 
@@ -36,8 +36,8 @@ describe("api endpoints", () => {
   let hashPassword: (password: string) => Promise<string>;
   let verifyPassword: (password: string, storedHash: string) => Promise<boolean>;
   let generatePairingCode: () => Promise<string>;
-  let ensureAdmin: (user: { is_admin: number } | null) => boolean;
-  let getRequester: (req: Request) => Promise<{ id: number; is_admin: number } | null>;
+  let ensureAdmin: (user: { role: string } | null) => boolean;
+  let getRequester: (req: Request) => Promise<{ id: number; role: string } | null>;
 
   beforeEach(async () => {
     queryMock = vi.fn();
@@ -59,8 +59,9 @@ describe("api endpoints", () => {
   });
 
   it("ensureAdmin returns expected boolean", () => {
-    expect(ensureAdmin({ is_admin: 1 })).toBe(true);
-    expect(ensureAdmin({ is_admin: 0 })).toBe(false);
+    expect(ensureAdmin({ role: "admin" })).toBe(true);
+    expect(ensureAdmin({ role: "dev" })).toBe(true);
+    expect(ensureAdmin({ role: "user" })).toBe(false);
     expect(ensureAdmin(null)).toBe(false);
   });
 
@@ -76,7 +77,7 @@ describe("api endpoints", () => {
     const user = await getRequester(req);
     expect(user).toMatchObject({
       id: 1,
-      is_admin: 1,
+      role: "admin",
       username: "Admin",
     });
   });

@@ -1,7 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Auth, Dashboard, AdminDashboard, Settings } from './components';
+import { Auth, Dashboard, AdminDashboard, AuditLogs, Settings } from './components';
+import { api } from './api';
 import type { AuthUser } from './types';
+
+const normalizeFlag = (value: unknown) =>
+  value === true || value === 1 || value === '1' || value === 'true';
+
+const isAdminRole = (user: AuthUser) => {
+  const isAdminFlag = normalizeFlag(user.is_admin);
+  const isDevFlag = normalizeFlag(user.is_dev);
+  return isAdminFlag || isDevFlag || user.role === 'admin' || user.role === 'dev';
+};
 
 function App() {
   const [user, setUser] = useState<AuthUser | null>(() => {
@@ -13,6 +23,22 @@ function App() {
       return null;
     }
   });
+
+  useEffect(() => {
+    const refreshUser = async () => {
+      if (!user) return;
+      try {
+        const current = await api.getMe();
+        if (current) {
+          localStorage.setItem('authUser', JSON.stringify(current));
+          setUser(current);
+        }
+      } catch (error) {
+        console.warn('Failed to refresh user:', error);
+      }
+    };
+    refreshUser();
+  }, [user?.id]);
 
   const handleAuth = (nextUser: AuthUser) => {
     localStorage.setItem('authUser', JSON.stringify(nextUser));
@@ -43,8 +69,18 @@ function App() {
         <Route
           path="/admin"
           element={
-            user.is_admin === 1 ? (
+            isAdminRole(user) ? (
               <AdminDashboard user={user} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route
+          path="/audit"
+          element={
+            isAdminRole(user) ? (
+              <AuditLogs user={user} onLogout={handleLogout} />
             ) : (
               <Navigate to="/" replace />
             )

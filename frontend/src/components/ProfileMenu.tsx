@@ -17,6 +17,16 @@ const getInitials = (value: string) =>
 export function ProfileMenu({ user, onLogout, onSettings }: ProfileMenuProps) {
   const label = user.username || user.email;
   const initials = getInitials(label);
+  const isDev = user.role === 'dev' || user.is_dev === 1 || user.is_dev === true;
+  const isAdmin =
+    user.role === 'admin' ||
+    user.is_admin === 1 ||
+    user.is_admin === true ||
+    user.is_admin === '1' ||
+    user.is_admin === 'true';
+  const isDevFlag =
+    user.is_dev === 1 || user.is_dev === true || user.is_dev === '1' || user.is_dev === 'true';
+  const roleLabel = isDevFlag || isDev ? 'Dev' : isAdmin ? 'Admin' : 'User';
 
   return (
     <details className="relative">
@@ -27,7 +37,7 @@ export function ProfileMenu({ user, onLogout, onSettings }: ProfileMenuProps) {
           </div>
           <div className="hidden sm:flex flex-col leading-tight">
             <span className="text-sm text-gray-200 font-semibold">{label}</span>
-            <span className="text-xs text-gray-500">{user.is_admin === 1 ? 'Admin' : 'User'}</span>
+            <span className="text-xs text-gray-500">{roleLabel}</span>
           </div>
         </div>
       </summary>

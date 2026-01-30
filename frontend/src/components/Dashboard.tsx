@@ -8,6 +8,7 @@ import SensorCard from './SensorCard';
 import Chart from './Chart';
 import DataTable from './DataTable';
 import DeviceSelector from './DeviceSelector';
+import { isUserPrivileged } from '../utils/flags';
 
 interface DashboardProps {
   user?: AuthUser | null;
@@ -24,17 +25,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 export function Dashboard({ user, onLogout }: DashboardProps) {
   const navigate = useNavigate();
-  const isAdmin =
-    user?.role === 'admin' ||
-    user?.role === 'dev' ||
-    user?.is_admin === 1 ||
-    user?.is_admin === true ||
-    user?.is_admin === '1' ||
-    user?.is_admin === 'true' ||
-    user?.is_dev === 1 ||
-    user?.is_dev === true ||
-    user?.is_dev === '1' ||
-    user?.is_dev === 'true';
+  const isAdmin = isUserPrivileged(user);
   const [selectedDevice, setSelectedDevice] = useState<string>('');
   const [latestReading, setLatestReading] = useState<Reading | null>(null);
   const [history, setHistory] = useState<Reading[]>([]);

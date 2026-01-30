@@ -9,9 +9,9 @@ export interface AuthUser {
   id: number;
   username: string;
   email: string;
-  role: UserRole;
-  is_admin?: number | boolean;
-  is_dev?: number | boolean;
+  role?: UserRole;
+  is_admin?: number | boolean | string;
+  is_dev?: number | boolean | string;
   created_at: string;
 }
 

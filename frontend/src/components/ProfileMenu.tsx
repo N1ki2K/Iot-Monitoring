@@ -1,4 +1,5 @@
 import type { AuthUser } from '../types';
+import { isUserAdmin, isUserDev } from '../utils/flags';
 
 interface ProfileMenuProps {
   user: AuthUser;
@@ -17,16 +18,9 @@ const getInitials = (value: string) =>
 export function ProfileMenu({ user, onLogout, onSettings }: ProfileMenuProps) {
   const label = user.username || user.email;
   const initials = getInitials(label);
-  const isDev = user.role === 'dev' || user.is_dev === 1 || user.is_dev === true;
-  const isAdmin =
-    user.role === 'admin' ||
-    user.is_admin === 1 ||
-    user.is_admin === true ||
-    user.is_admin === '1' ||
-    user.is_admin === 'true';
-  const isDevFlag =
-    user.is_dev === 1 || user.is_dev === true || user.is_dev === '1' || user.is_dev === 'true';
-  const roleLabel = isDevFlag || isDev ? 'Dev' : isAdmin ? 'Admin' : 'User';
+  const isDev = isUserDev(user);
+  const isAdmin = isUserAdmin(user);
+  const roleLabel = isDev ? 'Dev' : isAdmin ? 'Admin' : 'User';
 
   return (
     <details className="relative">

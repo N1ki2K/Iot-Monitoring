@@ -9,7 +9,7 @@ export {
   type RegisterRequest,
   type UpdateProfileRequest,
   type ChangePasswordRequest,
-  UserRole,
+  type UserRole,
   UserStatus,
 
   // Reading types

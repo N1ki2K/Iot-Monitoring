@@ -20,6 +20,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
   const navigate = useNavigate();
+  const isAdmin = user.role === 'admin' || user.role === 'dev';
   const [username, setUsername] = useState(user.username);
   const [email, setEmail] = useState(user.email);
   const [profileStatus, setProfileStatus] = useState('');
@@ -166,7 +167,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
               >
                 Dashboard
               </NavLink>
-              {user.is_admin === 1 && (
+              {isAdmin && (
                 <NavLink
                   to="/admin"
                   className={({ isActive }) =>

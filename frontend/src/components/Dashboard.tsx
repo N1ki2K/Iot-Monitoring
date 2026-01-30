@@ -8,6 +8,7 @@ import SensorCard from './SensorCard';
 import Chart from './Chart';
 import DataTable from './DataTable';
 import DeviceSelector from './DeviceSelector';
+import { isUserPrivileged } from '../utils/flags';
 
 interface DashboardProps {
   user?: AuthUser | null;
@@ -24,6 +25,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 export function Dashboard({ user, onLogout }: DashboardProps) {
   const navigate = useNavigate();
+  const isAdmin = isUserPrivileged(user);
   const [selectedDevice, setSelectedDevice] = useState<string>('');
   const [latestReading, setLatestReading] = useState<Reading | null>(null);
   const [history, setHistory] = useState<Reading[]>([]);
@@ -42,7 +44,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   // Load devices on mount
   const loadDevices = useCallback(async () => {
     try {
-      if (user && user.is_admin !== 1) {
+      if (user && !isAdmin) {
         const assignments = await api.getUserControllers(user.id);
         const options = assignments.map((assignment) => ({
           id: assignment.device_id,
@@ -158,7 +160,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
           </div>
 
           <div className="flex items-center gap-4">
-            {user?.is_admin === 1 && (
+            {isAdmin && (
               <nav className="flex items-center gap-1 rounded-full bg-slate-800/70 p-1">
                 <NavLink
                   to="/"
@@ -171,19 +173,29 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                 >
                   Dashboard
                 </NavLink>
-                <NavLink
-                  to="/admin"
-                  className={({ isActive }) =>
-                    `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
-                      isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
-                    }`
-                  }
-                >
-                  Admin Dashboard
-                </NavLink>
-              </nav>
-            )}
-            {user?.is_admin !== 1 && deviceOptions.length === 0 ? (
+              <NavLink
+                to="/admin"
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
+                  }`
+                }
+              >
+                Admin Dashboard
+              </NavLink>
+              <NavLink
+                to="/audit"
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
+                  }`
+                }
+              >
+                Audit Logs
+              </NavLink>
+            </nav>
+          )}
+            {!isAdmin && deviceOptions.length === 0 ? (
               <button
                 onClick={() => setShowClaimModal(true)}
                 className="btn btn-secondary flex items-center gap-2"

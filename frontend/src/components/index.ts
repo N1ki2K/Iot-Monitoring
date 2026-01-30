@@ -5,5 +5,6 @@ export { DeviceSelector } from './DeviceSelector';
 export { Dashboard } from './Dashboard';
 export { Auth } from './Auth';
 export { AdminDashboard } from './AdminDashboard';
+export { AuditLogs } from './AuditLogs';
 export { ProfileMenu } from './ProfileMenu';
 export { Settings } from './Settings';

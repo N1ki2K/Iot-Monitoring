@@ -9,7 +9,7 @@ export {
   type RegisterRequest,
   type UpdateProfileRequest,
   type ChangePasswordRequest,
-  UserRole,
+  type UserRole,
   UserStatus,
 
   // Reading types
@@ -32,6 +32,10 @@ export {
   type ApiSuccess,
   type SortOrder,
   type PaginationParams,
+
+  // Audit types
+  type AuditLogEntry,
+  type AuditLogQueryParams,
 } from '@iot-monitoring/shared-types';
 
 /**

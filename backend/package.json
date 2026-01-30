@@ -5,6 +5,7 @@
   "scripts": {
     "ingest": "ts-node src/ingest.ts",
     "api": "ts-node src/api.ts",
+    "migrate": "tsx scripts/migrate.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",

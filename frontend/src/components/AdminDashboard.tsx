@@ -1,13 +1,36 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { NavLink, Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { AuthUser, UserListItem, UserControllerAssignment, Controller } from '../types';
+import type {
+  AuthUser,
+  UserListItem,
+  UserControllerAssignment,
+  Controller,
+  AuditLogEntry,
+  AuditLogQueryParams,
+  PaginatedResponse,
+} from '../types';
 import { ProfileMenu } from './ProfileMenu';
 
 interface AdminDashboardProps {
   user?: AuthUser | null;
   onLogout: () => void;
 }
+
+const normalizeFlag = (value: unknown) =>
+  value === true || value === 1 || value === '1' || value === 'true';
+
+const isAdminUser = (user?: AuthUser | null) => {
+  if (!user) return false;
+  const isAdminFlag = normalizeFlag(user.is_admin);
+  const isDevFlag = normalizeFlag(user.is_dev);
+  return isAdminFlag || isDevFlag || user.role === 'admin' || user.role === 'dev';
+};
+
+const isDevUser = (user?: AuthUser | null) => {
+  if (!user) return false;
+  return normalizeFlag(user.is_dev) || user.role === 'dev';
+};
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error && typeof error === 'object' && 'response' in error) {
@@ -19,6 +42,8 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const navigate = useNavigate();
+  const isAdmin = isAdminUser(user);
+  const isDev = isDevUser(user);
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [controllers, setControllers] = useState<Controller[]>([]);
   const [availableDevices, setAvailableDevices] = useState<string[]>([]);
@@ -27,6 +52,19 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const [newDeviceId, setNewDeviceId] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [assignments, setAssignments] = useState<UserControllerAssignment[]>([]);
+  const [auditData, setAuditData] = useState<PaginatedResponse<AuditLogEntry> | null>(null);
+  const [auditError, setAuditError] = useState('');
+  const [auditLoading, setAuditLoading] = useState(true);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditLimit, setAuditLimit] = useState(20);
+  const [auditFilters, setAuditFilters] = useState({
+    actorId: '',
+    action: '',
+    entityType: '',
+    entityId: '',
+  });
+  const [auditQuery, setAuditQuery] = useState<AuditLogQueryParams>({});
+  const [auditPurgeBefore, setAuditPurgeBefore] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [usersError, setUsersError] = useState('');
   const [assignError, setAssignError] = useState('');
@@ -34,7 +72,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
 
   useEffect(() => {
     const loadUsers = async () => {
-      if (!user || user.is_admin !== 1) return;
+      if (!isAdmin) return;
       setIsLoading(true);
       try {
         const data = await api.getUsers();
@@ -50,11 +88,11 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       }
     };
     loadUsers();
-  }, [user]);
+  }, [isAdmin]);
 
   useEffect(() => {
     const loadControllers = async () => {
-      if (!user || user.is_admin !== 1) return;
+      if (!isAdmin) return;
       try {
         const data = await api.getControllers();
         setControllers(data);
@@ -68,7 +106,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       }
     };
     loadControllers();
-  }, [user]);
+  }, [isAdmin]);
 
   useEffect(() => {
     const loadAssignments = async () => {
@@ -86,6 +124,29 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
     };
     loadAssignments();
   }, [selectedUserId]);
+
+  useEffect(() => {
+    const loadAuditLogs = async () => {
+      if (!isAdmin) return;
+      setAuditLoading(true);
+      setAuditError('');
+      try {
+        const data = await api.getAuditLogs({
+          ...auditQuery,
+          page: auditPage,
+          limit: auditLimit,
+        });
+        setAuditData(data);
+      } catch (error) {
+        const message = getErrorMessage(error, 'Failed to load audit logs.');
+        setAuditError(message);
+        setAuditData(null);
+      } finally {
+        setAuditLoading(false);
+      }
+    };
+    loadAuditLogs();
+  }, [isAdmin, auditQuery, auditPage, auditLimit]);
 
   const handleAssign = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -155,11 +216,58 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
     }
   };
 
+  const handleAuditApply = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAuditError('');
+    const nextQuery: AuditLogQueryParams = {};
+    const actorIdRaw = auditFilters.actorId.trim();
+    if (actorIdRaw) {
+      const actorId = Number(actorIdRaw);
+      if (Number.isNaN(actorId)) {
+        setAuditError('Actor ID must be a number.');
+        return;
+      }
+      nextQuery.actorId = actorId;
+    }
+    if (auditFilters.action.trim()) {
+      nextQuery.action = auditFilters.action.trim();
+    }
+    if (auditFilters.entityType.trim()) {
+      nextQuery.entityType = auditFilters.entityType.trim();
+    }
+    if (auditFilters.entityId.trim()) {
+      nextQuery.entityId = auditFilters.entityId.trim();
+    }
+    setAuditQuery(nextQuery);
+    setAuditPage(1);
+  };
+
+  const handleAuditClear = () => {
+    setAuditFilters({
+      actorId: '',
+      action: '',
+      entityType: '',
+      entityId: '',
+    });
+    setAuditQuery({});
+    setAuditPage(1);
+  };
+
+  const formatAuditMetadata = (metadata: AuditLogEntry['metadata']) => {
+    if (!metadata) return '-';
+    if (typeof metadata === 'string') return metadata;
+    try {
+      return JSON.stringify(metadata);
+    } catch {
+      return '[metadata]';
+    }
+  };
+
   if (!user) {
     return <Navigate to="/" replace />;
   }
 
-  if (user.is_admin !== 1) {
+  if (!isAdmin) {
     return <Navigate to="/" replace />;
   }
 
@@ -204,6 +312,16 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               >
                 Admin Dashboard
               </NavLink>
+              <NavLink
+                to="/audit"
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
+                  }`
+                }
+              >
+                Audit Logs
+              </NavLink>
             </nav>
             {user && (
               <ProfileMenu
@@ -230,19 +348,20 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                     <th>Username</th>
                     <th>Email</th>
                     <th>Admin</th>
+                    <th>Dev</th>
                     <th>Created</th>
                   </tr>
                 </thead>
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={4} className="text-center py-8 text-gray-500">
+                      <td colSpan={5} className="text-center py-8 text-gray-500">
                         Loading...
                       </td>
                     </tr>
                   ) : users.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="text-center py-8 text-gray-500">
+                      <td colSpan={5} className="text-center py-8 text-gray-500">
                         No users found
                       </td>
                     </tr>
@@ -251,7 +370,10 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                       <tr key={row.id}>
                         <td>{row.username}</td>
                         <td>{row.email}</td>
-                        <td>{row.is_admin === 1 ? 'Yes' : 'No'}</td>
+                        <td>
+                          {normalizeFlag(row.is_admin) || row.role === 'admin' ? 'Yes' : 'No'}
+                        </td>
+                        <td>{normalizeFlag(row.is_dev) || row.role === 'dev' ? 'Yes' : 'No'}</td>
                         <td>{new Date(row.created_at).toLocaleString()}</td>
                       </tr>
                     ))
@@ -455,6 +577,263 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
+          <div className="p-4 border-b border-slate-700/40">
+            <h3 className="text-lg font-semibold text-gray-200">Audit Log</h3>
+            <p className="text-sm text-gray-400 mt-1">Track user actions and system changes.</p>
+          </div>
+          <div className="p-4 space-y-4">
+            <form className="grid gap-4 lg:grid-cols-6" onSubmit={handleAuditApply}>
+              <div className="lg:col-span-1">
+                <label className="text-sm text-gray-300">Actor ID</label>
+                <input
+                  className="input mt-2"
+                  placeholder="123"
+                  value={auditFilters.actorId}
+                  onChange={(event) =>
+                    setAuditFilters((prev) => ({ ...prev, actorId: event.target.value }))
+                  }
+                />
+              </div>
+              <div className="lg:col-span-2">
+                <label className="text-sm text-gray-300">Action</label>
+                <input
+                  className="input mt-2"
+                  placeholder="user.login"
+                  value={auditFilters.action}
+                  onChange={(event) =>
+                    setAuditFilters((prev) => ({ ...prev, action: event.target.value }))
+                  }
+                />
+              </div>
+              <div className="lg:col-span-2">
+                <label className="text-sm text-gray-300">Entity Type</label>
+                <input
+                  className="input mt-2"
+                  placeholder="controller"
+                  value={auditFilters.entityType}
+                  onChange={(event) =>
+                    setAuditFilters((prev) => ({ ...prev, entityType: event.target.value }))
+                  }
+                />
+              </div>
+              <div className="lg:col-span-1">
+                <label className="text-sm text-gray-300">Entity ID</label>
+                <input
+                  className="input mt-2"
+                  placeholder="42"
+                  value={auditFilters.entityId}
+                  onChange={(event) =>
+                    setAuditFilters((prev) => ({ ...prev, entityId: event.target.value }))
+                  }
+                />
+              </div>
+              <div className="lg:col-span-1">
+                <label className="text-sm text-gray-300">Rows</label>
+                <select
+                  className="select w-full mt-2"
+                  value={auditLimit}
+                  onChange={(event) => {
+                    setAuditLimit(Number(event.target.value));
+                    setAuditPage(1);
+                  }}
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+              <div className="lg:col-span-1 flex items-end gap-2">
+                <button className="btn btn-primary w-full" type="submit">
+                  Apply
+                </button>
+                <button className="btn btn-ghost w-full" type="button" onClick={handleAuditClear}>
+                  Clear
+                </button>
+              </div>
+            </form>
+
+            {auditError && (
+              <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+                {auditError}
+              </div>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="!cursor-default">Time</th>
+                    <th className="!cursor-default">Actor</th>
+                    <th className="!cursor-default">Action</th>
+                    <th className="!cursor-default">Entity</th>
+                    <th className="!cursor-default">Source</th>
+                    <th className="!cursor-default">IP</th>
+                    <th className="!cursor-default">Metadata</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditLoading ? (
+                    Array.from({ length: 6 }).map((_, index) => (
+                      <tr key={`audit-skeleton-${index}`}>
+                        {Array.from({ length: 7 }).map((__, cell) => (
+                          <td key={`audit-skeleton-cell-${cell}`}>
+                            <div className="h-4 bg-slate-700/50 rounded animate-pulse w-24" />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : auditData?.data.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-8 text-gray-500">
+                        No audit entries found
+                      </td>
+                    </tr>
+                  ) : (
+                    auditData?.data.map((entry) => {
+                      const actorLabel = entry.actor_email
+                        ? entry.actor_email
+                        : entry.actor_id
+                          ? `User ${entry.actor_id}`
+                          : 'System';
+                      const entityLabel = entry.entity_id
+                        ? `${entry.entity_type} • ${entry.entity_id}`
+                        : entry.entity_type;
+                      const sourceLabel =
+                        entry.metadata && typeof entry.metadata === 'object' && 'client' in entry.metadata
+                          ? String(entry.metadata.client)
+                          : '-';
+                      const metadataText = formatAuditMetadata(entry.metadata);
+                      return (
+                        <tr key={entry.id}>
+                          <td>{new Date(entry.created_at).toLocaleString()}</td>
+                          <td title={actorLabel}>{actorLabel}</td>
+                          <td>
+                            <span className="badge bg-slate-700/60 text-slate-200 border border-slate-600/60">
+                              {entry.action}
+                            </span>
+                          </td>
+                          <td>{entityLabel}</td>
+                          <td>{sourceLabel}</td>
+                          <td>{entry.ip_address || '-'}</td>
+                          <td className="max-w-[16rem] truncate" title={metadataText}>
+                            {metadataText}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {isDev && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-slate-700/40 pt-4">
+                <div className="text-sm text-gray-400">Dev tools: purge audit log entries.</div>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                  <input
+                    className="input sm:w-60"
+                    type="datetime-local"
+                    value={auditPurgeBefore}
+                    onChange={(event) => setAuditPurgeBefore(event.target.value)}
+                  />
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    onClick={async () => {
+                      if (!auditPurgeBefore) {
+                        setAuditError('Select a date/time to purge before.');
+                        return;
+                      }
+                      try {
+                        const beforeDate = new Date(auditPurgeBefore);
+                        if (Number.isNaN(beforeDate.getTime())) {
+                          setAuditError('Invalid date/time for purge.');
+                          return;
+                        }
+                        const beforeIso = beforeDate.toISOString();
+                        await api.purgeAuditLogs({ before: beforeIso });
+                        const data = await api.getAuditLogs({
+                          ...auditQuery,
+                          page: 1,
+                          limit: auditLimit,
+                        });
+                        setAuditData(data);
+                        setAuditPage(1);
+                      } catch (error) {
+                        const message = getErrorMessage(error, 'Failed to purge audit logs.');
+                        setAuditError(message);
+                      }
+                    }}
+                  >
+                    Purge Before
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm('Purge all audit logs? This cannot be undone.')) return;
+                      try {
+                        await api.purgeAuditLogs({ all: true });
+                        const data = await api.getAuditLogs({
+                          ...auditQuery,
+                          page: 1,
+                          limit: auditLimit,
+                        });
+                        setAuditData(data);
+                        setAuditPage(1);
+                      } catch (error) {
+                        const message = getErrorMessage(error, 'Failed to purge audit logs.');
+                        setAuditError(message);
+                      }
+                    }}
+                  >
+                    Purge All
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-slate-700/40 pt-4">
+              <p className="text-sm text-gray-500">
+                {auditData ? (
+                  <>
+                    Showing {((auditPage - 1) * auditLimit) + 1} to{' '}
+                    {Math.min(auditPage * auditLimit, auditData.pagination.total)} of{' '}
+                    <span className="text-gray-300">{auditData.pagination.total}</span> events
+                  </>
+                ) : (
+                  'Loading...'
+                )}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setAuditPage((p) => Math.max(1, p - 1))}
+                  disabled={auditPage === 1 || auditLoading}
+                  className="btn btn-ghost"
+                >
+                  Prev
+                </button>
+                <span className="text-sm text-gray-400">
+                  Page {auditPage} of {auditData?.pagination.totalPages || 1}
+                </span>
+                <button
+                  onClick={() =>
+                    setAuditPage((p) =>
+                      auditData ? Math.min(auditData.pagination.totalPages, p + 1) : p + 1
+                    )
+                  }
+                  disabled={auditLoading || (auditData ? auditPage >= auditData.pagination.totalPages : false)}
+                  className="btn btn-ghost"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         </section>

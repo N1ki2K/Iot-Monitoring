@@ -9,7 +9,9 @@ export interface AuthUser {
   id: number;
   username: string;
   email: string;
-  is_admin: number;
+  role?: UserRole;
+  is_admin?: number | boolean | string;
+  is_dev?: number | boolean | string;
   created_at: string;
 }
 
@@ -21,10 +23,7 @@ export type UserListItem = AuthUser;
 /**
  * User role enum
  */
-export enum UserRole {
-  USER = 0,
-  ADMIN = 1,
-}
+export type UserRole = 'user' | 'admin' | 'dev';
 
 /**
  * User status enum (for future user management features)

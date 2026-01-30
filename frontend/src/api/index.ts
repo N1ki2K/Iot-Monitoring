@@ -6,6 +6,8 @@ import type {
   UserListItem,
   UserControllerAssignment,
   Controller,
+  AuditLogEntry,
+  AuditLogQueryParams,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -34,6 +36,10 @@ client.interceptors.request.use((config) => {
     if (!config.headers['x-user-id']) {
       config.headers['x-user-id'] = userId;
     }
+  }
+  config.headers = config.headers ?? {};
+  if (!config.headers['x-client']) {
+    config.headers['x-client'] = 'web';
   }
   return config;
 });
@@ -138,6 +144,31 @@ export const api = {
   getAvailableDevices: async (): Promise<string[]> => {
     const { data } = await client.get<string[]>('/controllers/available-devices');
     return data;
+  },
+
+  getAuditLogs: async (
+    params: AuditLogQueryParams
+  ): Promise<PaginatedResponse<AuditLogEntry>> => {
+    const { data } = await client.get<PaginatedResponse<AuditLogEntry>>('/audit', {
+      params: {
+        page: params.page || 1,
+        limit: params.limit || 20,
+        actorId: params.actorId || undefined,
+        action: params.action || undefined,
+        entityType: params.entityType || undefined,
+        entityId: params.entityId || undefined,
+      },
+    });
+    return data;
+  },
+
+  purgeAuditLogs: async (params: { all?: boolean; before?: string }) => {
+    await client.delete('/audit', {
+      params: {
+        all: params.all ? 'true' : undefined,
+        before: params.before,
+      },
+    });
   },
 
   createController: async (payload: { deviceId: string; label?: string }) => {

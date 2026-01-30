@@ -6,4 +6,14 @@ import { resolve } from 'path'
 export default defineConfig({
   plugins: [react()],
   envDir: resolve(__dirname, '..'),
+  server: {
+    allowedHosts: ['109cc1ef77a1.ngrok-free.app'],
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 })

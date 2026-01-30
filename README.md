@@ -155,13 +155,14 @@ Open Adminer at `http://localhost:8080` and login with:
 | Password | `iotpass`  |
 | Database | `iot`      |
 
-Click "SQL command" and run the following to create the `readings` table:
+Click "SQL command" and run the following to create the database tables:
 
 ```sql
 CREATE DATABASE iot;
 
 \c iot
 
+-- Sensor readings from IoT devices
 CREATE TABLE readings (
   id SERIAL PRIMARY KEY,
   device_id VARCHAR(64) NOT NULL,
@@ -174,7 +175,67 @@ CREATE TABLE readings (
 );
 
 CREATE INDEX idx_readings_device_ts ON readings(device_id, ts DESC);
+
+-- User accounts
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(64) UNIQUE NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'user',
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+  is_dev BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- IoT controllers/devices
+CREATE TABLE controllers (
+  id SERIAL PRIMARY KEY,
+  device_id VARCHAR(64) UNIQUE NOT NULL,
+  label TEXT,
+  pairing_code VARCHAR(6) UNIQUE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- User-to-controller assignments (many-to-many)
+CREATE TABLE user_controllers (
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  controller_id INTEGER REFERENCES controllers(id) ON DELETE CASCADE,
+  label TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  PRIMARY KEY (user_id, controller_id)
+);
+
+-- Audit logs for admin actions
+CREATE TABLE audit_logs (
+  id SERIAL PRIMARY KEY,
+  actor_id INTEGER,
+  actor_email TEXT,
+  action TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT,
+  metadata JSONB,
+  ip_address TEXT,
+  user_agent TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_logs_created_at ON audit_logs (created_at DESC);
+CREATE INDEX idx_audit_logs_actor_id ON audit_logs (actor_id);
+CREATE INDEX idx_audit_logs_action ON audit_logs (action);
+CREATE INDEX idx_audit_logs_entity_type ON audit_logs (entity_type);
+CREATE INDEX idx_audit_logs_entity_id ON audit_logs (entity_id);
 ```
+
+### Database Schema Overview
+
+| Table | Description |
+|-------|-------------|
+| `readings` | Sensor data from IoT devices (temperature, humidity, etc.) |
+| `users` | User accounts with roles and permissions |
+| `controllers` | Registered IoT controllers/devices |
+| `user_controllers` | Links users to their assigned controllers |
+| `audit_logs` | Tracks admin actions for security auditing |
 
 ### 4. Install Dependencies
 

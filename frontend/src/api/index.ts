@@ -37,6 +37,10 @@ client.interceptors.request.use((config) => {
       config.headers['x-user-id'] = userId;
     }
   }
+  config.headers = config.headers ?? {};
+  if (!config.headers['x-client']) {
+    config.headers['x-client'] = 'web';
+  }
   return config;
 });
 

@@ -155,13 +155,14 @@ docker compose up -d
 | Парола     | `iotpass`  |
 | База данни | `iot`      |
 
-Кликнете "SQL command" и изпълнете следното за създаване на таблицата `readings`:
+Кликнете "SQL command" и изпълнете следното за създаване на таблиците в базата данни:
 
 ```sql
 CREATE DATABASE iot;
 
 \c iot
 
+-- Показания от сензори на IoT устройства
 CREATE TABLE readings (
   id SERIAL PRIMARY KEY,
   device_id VARCHAR(64) NOT NULL,
@@ -174,7 +175,67 @@ CREATE TABLE readings (
 );
 
 CREATE INDEX idx_readings_device_ts ON readings(device_id, ts DESC);
+
+-- Потребителски акаунти
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(64) UNIQUE NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'user',
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+  is_dev BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- IoT контролери/устройства
+CREATE TABLE controllers (
+  id SERIAL PRIMARY KEY,
+  device_id VARCHAR(64) UNIQUE NOT NULL,
+  label TEXT,
+  pairing_code VARCHAR(6) UNIQUE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Връзки потребител-контролер (много към много)
+CREATE TABLE user_controllers (
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  controller_id INTEGER REFERENCES controllers(id) ON DELETE CASCADE,
+  label TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  PRIMARY KEY (user_id, controller_id)
+);
+
+-- Одит логове за администраторски действия
+CREATE TABLE audit_logs (
+  id SERIAL PRIMARY KEY,
+  actor_id INTEGER,
+  actor_email TEXT,
+  action TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT,
+  metadata JSONB,
+  ip_address TEXT,
+  user_agent TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_logs_created_at ON audit_logs (created_at DESC);
+CREATE INDEX idx_audit_logs_actor_id ON audit_logs (actor_id);
+CREATE INDEX idx_audit_logs_action ON audit_logs (action);
+CREATE INDEX idx_audit_logs_entity_type ON audit_logs (entity_type);
+CREATE INDEX idx_audit_logs_entity_id ON audit_logs (entity_id);
 ```
+
+### Преглед на Схемата на Базата Данни
+
+| Таблица | Описание |
+|---------|----------|
+| `readings` | Данни от сензори на IoT устройства (температура, влажност и др.) |
+| `users` | Потребителски акаунти с роли и права |
+| `controllers` | Регистрирани IoT контролери/устройства |
+| `user_controllers` | Връзки между потребители и техните контролери |
+| `audit_logs` | Проследяване на администраторски действия за одит |
 
 ### 4. Инсталиране на Зависимости
 

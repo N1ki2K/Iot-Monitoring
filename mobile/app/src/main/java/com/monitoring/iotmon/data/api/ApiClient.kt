@@ -27,6 +27,7 @@ object ApiClient {
         userId?.let {
             requestBuilder.addHeader("x-user-id", it.toString())
         }
+        requestBuilder.addHeader("x-client", "mobile")
 
         chain.proceed(requestBuilder.build())
     }

@@ -10,7 +10,16 @@ import cors from "cors";
 import { Pool } from "pg";
 
 export const app = express();
-app.use(cors());
+const corsOrigins = (process.env.CORS_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+app.use(
+  cors({
+    origin: corsOrigins.length > 0 ? corsOrigins : true,
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 const pool = new Pool({
@@ -94,6 +103,19 @@ const logAudit = async ({
   metadata?: Record<string, unknown>;
 }) => {
   try {
+    const clientHeader = req.header("x-client")?.toLowerCase().trim();
+    const userAgent = req.header("user-agent") ?? "";
+    const inferredClient =
+      userAgent && /android|ios|okhttp|reactnative|expo/i.test(userAgent)
+        ? "mobile"
+        : userAgent
+          ? "web"
+          : null;
+    const clientTag = clientHeader || inferredClient;
+    const metadataWithClient =
+      clientTag && (!metadata || !("client" in metadata))
+        ? { ...metadata, client: clientTag }
+        : metadata;
     await pool.query(
       `INSERT INTO audit_logs (actor_id, actor_email, action, entity_type, entity_id, metadata, ip_address, user_agent)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -103,9 +125,9 @@ const logAudit = async ({
         action,
         entityType,
         entityId ? String(entityId) : null,
-        metadata ? JSON.stringify(metadata) : null,
+        metadataWithClient ? JSON.stringify(metadataWithClient) : null,
         req.ip ?? null,
-        req.header("user-agent") ?? null,
+        userAgent || null,
       ]
     );
   } catch (error) {

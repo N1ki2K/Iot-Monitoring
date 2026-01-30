@@ -672,6 +672,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                     <th className="!cursor-default">Actor</th>
                     <th className="!cursor-default">Action</th>
                     <th className="!cursor-default">Entity</th>
+                    <th className="!cursor-default">Source</th>
                     <th className="!cursor-default">IP</th>
                     <th className="!cursor-default">Metadata</th>
                   </tr>
@@ -680,7 +681,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   {auditLoading ? (
                     Array.from({ length: 6 }).map((_, index) => (
                       <tr key={`audit-skeleton-${index}`}>
-                        {Array.from({ length: 6 }).map((__, cell) => (
+                        {Array.from({ length: 7 }).map((__, cell) => (
                           <td key={`audit-skeleton-cell-${cell}`}>
                             <div className="h-4 bg-slate-700/50 rounded animate-pulse w-24" />
                           </td>
@@ -689,7 +690,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                     ))
                   ) : auditData?.data.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-gray-500">
+                      <td colSpan={7} className="text-center py-8 text-gray-500">
                         No audit entries found
                       </td>
                     </tr>
@@ -703,6 +704,10 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                       const entityLabel = entry.entity_id
                         ? `${entry.entity_type} • ${entry.entity_id}`
                         : entry.entity_type;
+                      const sourceLabel =
+                        entry.metadata && typeof entry.metadata === 'object' && 'client' in entry.metadata
+                          ? String(entry.metadata.client)
+                          : '-';
                       const metadataText = formatAuditMetadata(entry.metadata);
                       return (
                         <tr key={entry.id}>
@@ -714,6 +719,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                             </span>
                           </td>
                           <td>{entityLabel}</td>
+                          <td>{sourceLabel}</td>
                           <td>{entry.ip_address || '-'}</td>
                           <td className="max-w-[16rem] truncate" title={metadataText}>
                             {metadataText}

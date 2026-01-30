@@ -16,13 +16,14 @@ npm install
 
 ## Database Setup
 
-Create the PostgreSQL database and table:
+Create the PostgreSQL database and tables:
 
 ```sql
 CREATE DATABASE iot;
 
 \c iot
 
+-- Sensor readings from IoT devices
 CREATE TABLE readings (
   id SERIAL PRIMARY KEY,
   device_id VARCHAR(64) NOT NULL,
@@ -36,6 +37,37 @@ CREATE TABLE readings (
 
 CREATE INDEX idx_readings_device_ts ON readings(device_id, ts DESC);
 
+-- User accounts
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(64) UNIQUE NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'user',
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+  is_dev BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- IoT controllers/devices
+CREATE TABLE controllers (
+  id SERIAL PRIMARY KEY,
+  device_id VARCHAR(64) UNIQUE NOT NULL,
+  label TEXT,
+  pairing_code VARCHAR(6) UNIQUE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- User-to-controller assignments (many-to-many)
+CREATE TABLE user_controllers (
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  controller_id INTEGER REFERENCES controllers(id) ON DELETE CASCADE,
+  label TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  PRIMARY KEY (user_id, controller_id)
+);
+
+-- Audit logs for admin actions
 CREATE TABLE audit_logs (
   id SERIAL PRIMARY KEY,
   actor_id INTEGER,
@@ -55,6 +87,16 @@ CREATE INDEX idx_audit_logs_action ON audit_logs (action);
 CREATE INDEX idx_audit_logs_entity_type ON audit_logs (entity_type);
 CREATE INDEX idx_audit_logs_entity_id ON audit_logs (entity_id);
 ```
+
+### Schema Overview
+
+| Table | Description |
+|-------|-------------|
+| `readings` | Sensor data from IoT devices |
+| `users` | User accounts with roles (user/admin) |
+| `controllers` | Registered IoT controllers |
+| `user_controllers` | User-to-controller assignments |
+| `audit_logs` | Admin action audit trail |
 
 ### Apply SQL Migrations
 

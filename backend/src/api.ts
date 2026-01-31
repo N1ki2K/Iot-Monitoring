@@ -22,6 +22,33 @@ app.use(
 );
 app.use(express.json());
 
+const requestMetrics = {
+  total: 0,
+  byStatus: new Map<string, number>(),
+  byRoute: new Map<string, number>(),
+  since: new Date(),
+};
+
+app.use((req, res, next) => {
+  res.on("finish", () => {
+    requestMetrics.total += 1;
+    const statusKey = String(res.statusCode);
+    requestMetrics.byStatus.set(
+      statusKey,
+      (requestMetrics.byStatus.get(statusKey) ?? 0) + 1
+    );
+    const routePath = req.route?.path
+      ? `${req.baseUrl}${req.route.path}`
+      : req.path;
+    const routeKey = `${req.method} ${routePath}`;
+    requestMetrics.byRoute.set(
+      routeKey,
+      (requestMetrics.byRoute.get(routeKey) ?? 0) + 1
+    );
+  });
+  next();
+});
+
 const pool = new Pool({
   host: process.env.PGHOST,
   port: Number(process.env.PGPORT),
@@ -36,7 +63,7 @@ export const getRequester = async (req: express.Request) => {
   const requesterId = Number(req.header("x-user-id"));
   if (!requesterId) return null;
   const result = await pool.query(
-    `SELECT id, username, email, role, is_admin, is_dev, created_at
+    `SELECT id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at
      FROM users
      WHERE id = $1`,
     [requesterId]
@@ -48,6 +75,7 @@ export const getRequester = async (req: express.Request) => {
     id: Number(row.id),
     is_admin: normalizeFlag(row.is_admin) ? 1 : 0,
     is_dev: normalizeFlag(row.is_dev) ? 1 : 0,
+    must_change_password: normalizeFlag(row.must_change_password),
   };
 };
 
@@ -78,6 +106,8 @@ export const generatePairingCode = async () => {
   }
   throw new Error("Failed to generate unique pairing code");
 };
+
+const generateTempPassword = () => crypto.randomBytes(6).toString("hex");
 
 const scryptAsync = (password: string, salt: Buffer) =>
   new Promise<Buffer>((resolve, reject) => {
@@ -172,7 +202,7 @@ app.post("/api/auth/register", async (req, res) => {
     const result = await pool.query(
       `INSERT INTO users (username, email, password, role)
        VALUES ($1, $2, $3, 'user')
-       RETURNING id, username, email, role, is_admin, is_dev, created_at`,
+       RETURNING id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at`,
       [username, email, passwordHash]
     );
     const created = result.rows[0];
@@ -180,6 +210,7 @@ app.post("/api/auth/register", async (req, res) => {
       ...created,
       is_admin: normalizeFlag(created.is_admin) ? 1 : 0,
       is_dev: normalizeFlag(created.is_dev) ? 1 : 0,
+      must_change_password: normalizeFlag(created.must_change_password),
     };
     await logAudit({
       req,
@@ -206,7 +237,7 @@ app.post("/api/auth/login", async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, username, email, password, role, is_admin, is_dev, created_at
+      `SELECT id, username, email, password, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at
        FROM users
        WHERE email = $1`,
       [email]
@@ -227,6 +258,9 @@ app.post("/api/auth/login", async (req, res) => {
       role: user.role,
       is_admin: normalizeFlag(user.is_admin) ? 1 : 0,
       is_dev: normalizeFlag(user.is_dev) ? 1 : 0,
+      invited_by: user.invited_by ?? null,
+      invited_at: user.invited_at ?? null,
+      must_change_password: normalizeFlag(user.must_change_password),
       created_at: user.created_at,
     };
     await logAudit({
@@ -266,7 +300,7 @@ app.patch("/api/me", async (req, res) => {
       `UPDATE users
        SET username = $1, email = $2
        WHERE id = $3
-       RETURNING id, username, email, role, is_admin, is_dev, created_at`,
+       RETURNING id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at`,
       [username, email, requester.id]
     );
     const updated = result.rows[0];
@@ -274,6 +308,7 @@ app.patch("/api/me", async (req, res) => {
       ...updated,
       is_admin: normalizeFlag(updated.is_admin) ? 1 : 0,
       is_dev: normalizeFlag(updated.is_dev) ? 1 : 0,
+      must_change_password: normalizeFlag(updated.must_change_password),
     };
     await logAudit({
       req,
@@ -318,7 +353,7 @@ app.patch("/api/me/password", async (req, res) => {
     }
     const passwordHash = await hashPassword(newPassword);
     await pool.query(
-      `UPDATE users SET password = $1 WHERE id = $2`,
+      `UPDATE users SET password = $1, must_change_password = FALSE WHERE id = $2`,
       [passwordHash, requester.id]
     );
     await logAudit({
@@ -369,7 +404,7 @@ app.get("/api/users", async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT id, username, email, role, is_admin, is_dev, created_at
+      `SELECT id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at
        FROM users
        ORDER BY created_at DESC`
     );
@@ -377,11 +412,249 @@ app.get("/api/users", async (req, res) => {
       ...row,
       is_admin: normalizeFlag(row.is_admin) ? 1 : 0,
       is_dev: normalizeFlag(row.is_dev) ? 1 : 0,
+      must_change_password: normalizeFlag(row.must_change_password),
     }));
     return res.json(response);
   } catch (error) {
     console.error("Fetch users failed:", error);
     return res.status(500).json({ error: "failed to fetch users" });
+  }
+});
+
+app.post("/api/admin/users/invite", async (req, res) => {
+  const requester = await getRequester(req);
+  const { username, email, role } = req.body ?? {};
+  if (!requester || !ensureAdmin(requester)) {
+    return res.status(403).json({ error: "admin access required" });
+  }
+  if (!username || !email) {
+    return res.status(400).json({ error: "username and email are required" });
+  }
+  const normalizedRole = role ?? "user";
+  if (!["user", "admin", "dev"].includes(normalizedRole)) {
+    return res.status(400).json({ error: "invalid role" });
+  }
+  if (normalizedRole !== "user" && !ensureDev(requester)) {
+    return res.status(403).json({ error: "dev access required to invite elevated users" });
+  }
+
+  try {
+    const tempPassword = generateTempPassword();
+    const passwordHash = await hashPassword(tempPassword);
+    const invitedAt = new Date();
+    const result = await pool.query(
+      `INSERT INTO users (username, email, password, role, invited_by, invited_at, must_change_password)
+       VALUES ($1, $2, $3, $4, $5, $6, TRUE)
+       RETURNING id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at`,
+      [username, email, passwordHash, normalizedRole, requester.id, invitedAt]
+    );
+    const created = result.rows[0];
+    const response = {
+      ...created,
+      is_admin: normalizeFlag(created.is_admin) ? 1 : 0,
+      is_dev: normalizeFlag(created.is_dev) ? 1 : 0,
+      must_change_password: normalizeFlag(created.must_change_password),
+    };
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "user.invite",
+      entityType: "user",
+      entityId: created.id,
+      metadata: { username, email, role: normalizedRole },
+    });
+    return res.status(201).json({ user: response, tempPassword });
+  } catch (error) {
+    if (getErrorCode(error) === "23505") {
+      return res.status(409).json({ error: "username or email already exists" });
+    }
+    console.error("Invite user failed:", error);
+    return res.status(500).json({ error: "failed to invite user" });
+  }
+});
+
+app.get("/api/users/:userId", async (req, res) => {
+  const requester = await getRequester(req);
+  const userId = Number(req.params.userId);
+  if (!requester || !userId) {
+    return res.status(400).json({ error: "invalid user id" });
+  }
+  if (!ensureAdmin(requester)) {
+    return res.status(403).json({ error: "admin access required" });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at
+       FROM users
+       WHERE id = $1`,
+      [userId]
+    );
+    const row = result.rows[0];
+    if (!row) {
+      return res.status(404).json({ error: "user not found" });
+    }
+    return res.json({
+      ...row,
+      is_admin: normalizeFlag(row.is_admin) ? 1 : 0,
+      is_dev: normalizeFlag(row.is_dev) ? 1 : 0,
+      must_change_password: normalizeFlag(row.must_change_password),
+    });
+  } catch (error) {
+    console.error("Fetch user failed:", error);
+    return res.status(500).json({ error: "failed to fetch user" });
+  }
+});
+
+app.patch("/api/users/:userId", async (req, res) => {
+  const requester = await getRequester(req);
+  const userId = Number(req.params.userId);
+  const { username, email, role, is_admin, is_dev, must_change_password } = req.body ?? {};
+  if (!requester || !userId) {
+    return res.status(400).json({ error: "invalid user id" });
+  }
+  if (!ensureAdmin(requester)) {
+    return res.status(403).json({ error: "admin access required" });
+  }
+  if (
+    (role !== undefined || is_admin !== undefined || is_dev !== undefined) &&
+    !ensureDev(requester)
+  ) {
+    return res.status(403).json({ error: "dev access required for role changes" });
+  }
+  if (role !== undefined && !["user", "admin", "dev"].includes(role)) {
+    return res.status(400).json({ error: "invalid role" });
+  }
+
+  const updates: string[] = [];
+  const params: (string | number | boolean | null)[] = [];
+  let paramIndex = 1;
+  const metadata: Record<string, unknown> = {};
+
+  if (username !== undefined) {
+    updates.push(`username = $${paramIndex}`);
+    params.push(username);
+    paramIndex++;
+    metadata.username = username;
+  }
+  if (email !== undefined) {
+    updates.push(`email = $${paramIndex}`);
+    params.push(email);
+    paramIndex++;
+    metadata.email = email;
+  }
+  if (role !== undefined) {
+    updates.push(`role = $${paramIndex}`);
+    params.push(role);
+    paramIndex++;
+    metadata.role = role;
+  }
+  if (is_admin !== undefined) {
+    updates.push(`is_admin = $${paramIndex}`);
+    params.push(Boolean(is_admin));
+    paramIndex++;
+    metadata.is_admin = Boolean(is_admin);
+  }
+  if (is_dev !== undefined) {
+    updates.push(`is_dev = $${paramIndex}`);
+    params.push(Boolean(is_dev));
+    paramIndex++;
+    metadata.is_dev = Boolean(is_dev);
+  }
+  if (must_change_password !== undefined) {
+    updates.push(`must_change_password = $${paramIndex}`);
+    params.push(Boolean(must_change_password));
+    paramIndex++;
+    metadata.must_change_password = Boolean(must_change_password);
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: "no fields to update" });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE users
+       SET ${updates.join(", ")}
+       WHERE id = $${paramIndex}
+       RETURNING id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at`,
+      [...params, userId]
+    );
+    const updated = result.rows[0];
+    if (!updated) {
+      return res.status(404).json({ error: "user not found" });
+    }
+    const response = {
+      ...updated,
+      is_admin: normalizeFlag(updated.is_admin) ? 1 : 0,
+      is_dev: normalizeFlag(updated.is_dev) ? 1 : 0,
+      must_change_password: normalizeFlag(updated.must_change_password),
+    };
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "user.update",
+      entityType: "user",
+      entityId: userId,
+      metadata,
+    });
+    return res.json(response);
+  } catch (error) {
+    if (getErrorCode(error) === "23505") {
+      return res.status(409).json({ error: "username or email already exists" });
+    }
+    console.error("Update user failed:", error);
+    return res.status(500).json({ error: "failed to update user" });
+  }
+});
+
+app.delete("/api/users/:userId", async (req, res) => {
+  const requester = await getRequester(req);
+  const userId = Number(req.params.userId);
+  if (!requester || !userId) {
+    return res.status(400).json({ error: "invalid user id" });
+  }
+  if (!ensureAdmin(requester)) {
+    return res.status(403).json({ error: "admin access required" });
+  }
+  if (requester.id === userId) {
+    return res.status(400).json({ error: "cannot delete self" });
+  }
+
+  try {
+    const targetResult = await pool.query(
+      `SELECT id, email, role, is_dev
+       FROM users
+       WHERE id = $1`,
+      [userId]
+    );
+    const target = targetResult.rows[0];
+    if (!target) {
+      return res.status(404).json({ error: "user not found" });
+    }
+    const targetIsDev =
+      target.role === "dev" || normalizeFlag(target.is_dev) ? true : false;
+    if (targetIsDev && !ensureDev(requester)) {
+      return res.status(403).json({ error: "dev access required" });
+    }
+
+    const result = await pool.query(
+      `DELETE FROM users WHERE id = $1 RETURNING id, email`,
+      [userId]
+    );
+    const deleted = result.rows[0];
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "user.admin_delete",
+      entityType: "user",
+      entityId: userId,
+      metadata: { email: deleted?.email ?? null },
+    });
+    return res.status(204).send();
+  } catch (error) {
+    console.error("Delete user failed:", error);
+    return res.status(500).json({ error: "failed to delete user" });
   }
 });
 
@@ -404,7 +677,7 @@ app.patch("/api/users/:userId/role", async (req, res) => {
       `UPDATE users
        SET role = $1
        WHERE id = $2
-       RETURNING id, username, email, role, is_admin, is_dev, created_at`,
+       RETURNING id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at`,
       [role, userId]
     );
     const updated = result.rows[0];
@@ -415,6 +688,7 @@ app.patch("/api/users/:userId/role", async (req, res) => {
       ...updated,
       is_admin: normalizeFlag(updated.is_admin) ? 1 : 0,
       is_dev: normalizeFlag(updated.is_dev) ? 1 : 0,
+      must_change_password: normalizeFlag(updated.must_change_password),
     };
     await logAudit({
       req,
@@ -433,8 +707,8 @@ app.patch("/api/users/:userId/role", async (req, res) => {
 
 app.get("/api/audit", async (req, res) => {
   const requester = await getRequester(req);
-  if (!requester || !ensureAdmin(requester)) {
-    return res.status(403).json({ error: "admin access required" });
+  if (!requester || !ensureDev(requester)) {
+    return res.status(403).json({ error: "dev access required" });
   }
 
   const page = Math.max(1, Number(req.query.page) || 1);
@@ -529,6 +803,87 @@ app.delete("/api/audit", async (req, res) => {
   } catch (error) {
     console.error("Purge audit logs failed:", error);
     return res.status(500).json({ error: "failed to purge audit logs" });
+  }
+});
+
+app.get("/api/admin/health", async (req, res) => {
+  const requester = await getRequester(req);
+  if (!requester || !ensureAdmin(requester)) {
+    return res.status(403).json({ error: "admin access required" });
+  }
+
+  try {
+    const [
+      dbSizeResult,
+      tableStatsResult,
+      controllerCountResult,
+      distinctDevicesResult,
+      activeDevicesResult,
+      readingCountResult,
+      latestReadingResult,
+      userStatsResult,
+    ] = await Promise.all([
+      pool.query(`SELECT pg_database_size(current_database()) AS size_bytes`),
+      pool.query(
+        `SELECT relname AS table, pg_total_relation_size(relid) AS bytes, n_live_tup AS rows
+         FROM pg_stat_user_tables
+         ORDER BY bytes DESC`
+      ),
+      pool.query(`SELECT COUNT(*) FROM controllers`),
+      pool.query(`SELECT COUNT(DISTINCT device_id) FROM readings`),
+      pool.query(
+        `SELECT COUNT(DISTINCT device_id) FROM readings WHERE ts > NOW() - INTERVAL '24 hours'`
+      ),
+      pool.query(`SELECT COUNT(*) FROM readings`),
+      pool.query(`SELECT MAX(ts) AS latest FROM readings`),
+      pool.query(
+        `SELECT
+           COUNT(*) AS total,
+           SUM(CASE WHEN role IN ('admin', 'dev') OR LOWER(is_admin::text) IN ('t', 'true', '1') THEN 1 ELSE 0 END) AS admins,
+           SUM(CASE WHEN role = 'dev' OR LOWER(is_dev::text) IN ('t', 'true', '1') THEN 1 ELSE 0 END) AS devs,
+           SUM(CASE WHEN invited_at IS NOT NULL THEN 1 ELSE 0 END) AS invited,
+           SUM(CASE WHEN must_change_password THEN 1 ELSE 0 END) AS must_change_password
+         FROM users`
+      ),
+    ]);
+
+    const userStats = userStatsResult.rows[0];
+
+    return res.json({
+      serverTime: new Date().toISOString(),
+      uptimeSeconds: Math.floor(process.uptime()),
+      requests: {
+        total: requestMetrics.total,
+        byStatus: Object.fromEntries(requestMetrics.byStatus.entries()),
+        byRoute: Object.fromEntries(requestMetrics.byRoute.entries()),
+        since: requestMetrics.since.toISOString(),
+      },
+      database: {
+        sizeBytes: Number(dbSizeResult.rows[0]?.size_bytes ?? 0),
+        tableSizes: tableStatsResult.rows.map((row) => ({
+          table: row.table,
+          bytes: Number(row.bytes),
+          rows: Number(row.rows),
+        })),
+      },
+      devices: {
+        totalControllers: Number(controllerCountResult.rows[0]?.count ?? 0),
+        distinctDevices: Number(distinctDevicesResult.rows[0]?.count ?? 0),
+        activeDevicesLast24h: Number(activeDevicesResult.rows[0]?.count ?? 0),
+        totalReadings: Number(readingCountResult.rows[0]?.count ?? 0),
+        latestReadingAt: latestReadingResult.rows[0]?.latest ?? null,
+      },
+      users: {
+        total: Number(userStats?.total ?? 0),
+        admins: Number(userStats?.admins ?? 0),
+        devs: Number(userStats?.devs ?? 0),
+        invited: Number(userStats?.invited ?? 0),
+        mustChangePassword: Number(userStats?.must_change_password ?? 0),
+      },
+    });
+  } catch (error) {
+    console.error("Fetch health stats failed:", error);
+    return res.status(500).json({ error: "failed to fetch health stats" });
   }
 });
 
@@ -1063,6 +1418,7 @@ export const startServer = () => {
   });
 };
 
+/* c8 ignore next */
 if (process.env.NODE_ENV !== "test") {
   startServer();
 }

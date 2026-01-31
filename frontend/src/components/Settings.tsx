@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { AuthUser, UserControllerAssignment } from '../types';
 import { ProfileMenu } from './ProfileMenu';
+import { normalizeFlag } from '../utils/flags';
 
 interface SettingsProps {
   user: AuthUser;
@@ -20,7 +21,8 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
   const navigate = useNavigate();
-  const isAdmin = user.role === 'admin' || user.role === 'dev';
+  const isAdmin = user.role === 'admin' || user.role === 'dev' || normalizeFlag(user.is_admin);
+  const isDev = user.role === 'dev' || normalizeFlag(user.is_dev);
   const [username, setUsername] = useState(user.username);
   const [email, setEmail] = useState(user.email);
   const [profileStatus, setProfileStatus] = useState('');
@@ -177,6 +179,30 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                   }
                 >
                   Admin Dashboard
+                </NavLink>
+              )}
+              {isDev && (
+                <NavLink
+                  to="/audit"
+                  className={({ isActive }) =>
+                    `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                      isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
+                    }`
+                  }
+                >
+                  Audit Logs
+                </NavLink>
+              )}
+              {isDev && (
+                <NavLink
+                  to="/health"
+                  className={({ isActive }) =>
+                    `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                      isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
+                    }`
+                  }
+                >
+                  System Health
                 </NavLink>
               )}
             </nav>

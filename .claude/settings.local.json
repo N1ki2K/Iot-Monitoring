@@ -28,7 +28,9 @@
       "Bash(npx tsc:*)",
       "Bash(npm run build:types:*)",
       "Bash(npm test:*)",
-      "Bash(./gradlew test:*)"
+      "Bash(./gradlew test:*)",
+      "Bash(xargs cat:*)",
+      "Bash(git log:*)"
     ]
   }
 }

@@ -12,16 +12,6 @@ interface AuditLogsProps {
 const normalizeFlag = (value: unknown) =>
   value === true || value === 1 || value === '1' || value === 'true';
 
-const isAdminUser = (user?: AuthUser | null) => {
-  if (!user) return false;
-  return (
-    normalizeFlag(user.is_admin) ||
-    normalizeFlag(user.is_dev) ||
-    user.role === 'admin' ||
-    user.role === 'dev'
-  );
-};
-
 const isDevUser = (user?: AuthUser | null) => {
   if (!user) return false;
   return normalizeFlag(user.is_dev) || user.role === 'dev';
@@ -37,7 +27,6 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 export function AuditLogs({ user, onLogout }: AuditLogsProps) {
   const navigate = useNavigate();
-  const isAdmin = isAdminUser(user);
   const isDev = isDevUser(user);
   const [auditData, setAuditData] = useState<PaginatedResponse<AuditLogEntry> | null>(null);
   const [auditError, setAuditError] = useState('');
@@ -55,7 +44,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
 
   useEffect(() => {
     const loadAuditLogs = async () => {
-      if (!isAdmin) return;
+      if (!isDev) return;
       setAuditLoading(true);
       setAuditError('');
       try {
@@ -74,7 +63,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
       }
     };
     loadAuditLogs();
-  }, [isAdmin, auditQuery, auditPage, auditLimit]);
+  }, [isDev, auditQuery, auditPage, auditLimit]);
 
   const handleAuditApply = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -127,7 +116,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
     return <Navigate to="/" replace />;
   }
 
-  if (!isAdmin) {
+  if (!isDev) {
     return <Navigate to="/" replace />;
   }
 
@@ -177,6 +166,16 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                 }
               >
                 Audit Logs
+              </NavLink>
+              <NavLink
+                to="/health"
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
+                  }`
+                }
+              >
+                System Health
               </NavLink>
             </nav>
             {user && (

@@ -1,42 +1,37 @@
 # Build stage
 FROM node:20-alpine AS builder
+WORKDIR /repo
 
-WORKDIR /app
+# Copy root manifests (workspace lockfile lives here)
+COPY package.json package-lock.json ./
 
-# Copy shared-types first
+# Copy workspace package.json files so npm can resolve workspaces
+COPY frontend/package.json ./frontend/package.json
+COPY backend/package.json ./backend/package.json
+COPY packages/shared-types/package.json ./packages/shared-types/package.json
+
+# Install deps for all workspaces using the ROOT lockfile
+RUN npm ci --workspaces
+
+# Copy actual sources
 COPY packages/shared-types ./packages/shared-types
+COPY frontend ./frontend
 
-# Build shared-types
-WORKDIR /app/packages/shared-types
-RUN npm ci && npm run build
-
-# Copy frontend
-WORKDIR /app/frontend
-COPY frontend/package*.json ./
-RUN npm ci
-
-COPY frontend/tsconfig*.json ./
-COPY frontend/vite.config.ts ./
-COPY frontend/tailwind.config.js ./
-COPY frontend/postcss.config.js ./
-COPY frontend/eslint.config.js ./
-COPY frontend/index.html ./
-COPY frontend/src ./src
-COPY frontend/public ./public
-
+# Build args
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
-RUN npm run build
+# Build shared-types + frontend
+RUN npm run build -w @iot-monitoring/shared-types && npm run build -w frontend
 
-# Production stage - nginx
+# Production stage
 FROM nginx:alpine AS production
 
 # Copy custom nginx config
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy built assets
-COPY --from=builder /app/frontend/dist /usr/share/nginx/html
+COPY --from=builder /repo/frontend/dist /usr/share/nginx/html
 
 EXPOSE 80
 

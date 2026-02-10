@@ -5,6 +5,7 @@ on:
     branches: [main, develop, 'feature/**', 'Imlement-Shared-Types']
   pull_request:
     branches: [main, develop]
+  workflow_call:
 
 jobs:
   # ============================================

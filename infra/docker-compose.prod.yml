@@ -62,7 +62,7 @@ services:
       dockerfile: backend/Dockerfile
     image: iot-monitoring-backend:latest
     container_name: iot-ingest
-    command: ["node", "dist/ingest.js"]
+    command: ["node", "dist/src/ingest.js"]
     environment:
       NODE_ENV: production
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}

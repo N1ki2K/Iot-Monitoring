@@ -44,4 +44,4 @@ WORKDIR /app/backend
 
 EXPOSE 3000
 
-CMD ["node", "dist/api.js"]
+CMD ["node", "dist/src/api.js"]

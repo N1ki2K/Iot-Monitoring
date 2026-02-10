@@ -1,0 +1,102 @@
+services:
+  # MQTT Broker
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: iot-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+    restart: unless-stopped
+    networks:
+      - iot-network
+
+  # Database
+  db:
+    image: postgres:16
+    container_name: iot-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - iot-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    image: iot-monitoring-backend:latest
+    container_name: iot-backend
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      MQTT_URL: mqtt://mqtt:1883
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - iot-network
+
+  # MQTT Ingest Service
+  ingest:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    image: iot-monitoring-backend:latest
+    container_name: iot-ingest
+    command: ["node", "dist/ingest.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      MQTT_URL: mqtt://mqtt:1883
+    depends_on:
+      db:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - iot-network
+
+  # Frontend
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    image: iot-monitoring-frontend:latest
+    container_name: iot-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - iot-network
+
+volumes:
+  postgres_data:
+  mosquitto_data:
+
+networks:
+  iot-network:
+    driver: bridge

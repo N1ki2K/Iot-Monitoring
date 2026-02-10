@@ -34,6 +34,7 @@ COPY --from=builder /repo/packages/shared-types ./packages/shared-types
 COPY --from=builder /repo/backend/package.json ./backend/package.json
 COPY --from=builder /repo/backend/dist ./backend/dist
 COPY --from=builder /repo/node_modules ./node_modules
+COPY --from=builder /repo/backend/node_modules ./backend/node_modules
 
 # Copy SQL migrations and scripts
 COPY backend/sql ./backend/sql

@@ -11,6 +11,7 @@ env:
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
+
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
@@ -24,29 +25,30 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
       - name: Deploy on server (git pull + docker compose)
         run: |
           ssh -i ~/.ssh/deploy_key \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
             "DEPLOY_PATH='${{ env.DEPLOY_PATH }}' bash -se" << 'ENDSSH'
-              set -euo pipefail
+          set -euo pipefail
 
-              cd "$DEPLOY_PATH"
+          cd "$DEPLOY_PATH"
 
-              if [ ! -d .git ]; then
-                echo "ERROR: $DEPLOY_PATH is not a git repo. Clone it first."
-                exit 1
-              fi
+          if [ ! -d .git ]; then
+            echo "ERROR: $DEPLOY_PATH is not a git repo. Clone it first."
+            exit 1
+          fi
 
-              git fetch --all
-              git reset --hard origin/main
+          git fetch --all
+          git reset --hard origin/main
 
-              cd infra
-              docker compose -f docker-compose.yml --env-file .env up -d --build
+          cd infra
+          docker compose -f docker-compose.yml --env-file .env up -d --build
 
-              docker compose -f docker-compose.yml exec -T backend node dist/scripts/migrate.js || true
-              docker image prune -f
-              docker compose -f docker-compose.yml ps
+          docker compose -f docker-compose.yml exec -T backend node dist/scripts/migrate.js || true
+          docker image prune -f
+          docker compose -f docker-compose.yml ps
           ENDSSH
 
       - name: Health check

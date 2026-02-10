@@ -22,6 +22,10 @@ app.use(
 );
 app.use(express.json());
 
+app.get("/api/health", (_req, res) => {
+  return res.status(200).json({ ok: true });
+});
+
 const pool = new Pool({
   host: process.env.PGHOST,
   port: Number(process.env.PGPORT),

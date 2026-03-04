@@ -12,6 +12,9 @@ export interface AuthUser {
   role?: UserRole;
   is_admin?: number | boolean | string;
   is_dev?: number | boolean | string;
+  invited_by?: number | null;
+  invited_at?: string | null;
+  must_change_password?: boolean | number | string;
   created_at: string;
 }
 
@@ -65,4 +68,33 @@ export interface UpdateProfileRequest {
 export interface ChangePasswordRequest {
   currentPassword: string;
   newPassword: string;
+}
+
+/**
+ * Admin invite payload
+ */
+export interface UserInviteRequest {
+  username: string;
+  email: string;
+  role?: UserRole;
+}
+
+/**
+ * Admin invite response
+ */
+export interface UserInviteResponse {
+  user: AuthUser;
+  tempPassword: string;
+}
+
+/**
+ * Admin user update payload
+ */
+export interface UpdateUserRequest {
+  username?: string;
+  email?: string;
+  role?: UserRole;
+  is_admin?: boolean;
+  is_dev?: boolean;
+  must_change_password?: boolean;
 }

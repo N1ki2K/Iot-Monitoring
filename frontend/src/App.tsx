@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Auth, Dashboard, AdminDashboard, AuditLogs, Settings } from './components';
+import { Auth, Dashboard, AdminDashboard, AuditLogs, Settings, SystemHealth, PasswordChangeRequired } from './components';
 import { api } from './api';
 import type { AuthUser } from './types';
 
@@ -11,6 +11,11 @@ const isAdminRole = (user: AuthUser) => {
   const isAdminFlag = normalizeFlag(user.is_admin);
   const isDevFlag = normalizeFlag(user.is_dev);
   return isAdminFlag || isDevFlag || user.role === 'admin' || user.role === 'dev';
+};
+
+const isDevRole = (user: AuthUser) => {
+  const isDevFlag = normalizeFlag(user.is_dev);
+  return isDevFlag || user.role === 'dev';
 };
 
 function App() {
@@ -62,6 +67,16 @@ function App() {
     return <Auth onAuth={handleAuth} />;
   }
 
+  if (normalizeFlag(user.must_change_password)) {
+    return (
+      <PasswordChangeRequired
+        user={user}
+        onUserUpdated={handleUserUpdated}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
@@ -79,8 +94,18 @@ function App() {
         <Route
           path="/audit"
           element={
-            isAdminRole(user) ? (
+            isDevRole(user) ? (
               <AuditLogs user={user} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route
+          path="/health"
+          element={
+            isDevRole(user) ? (
+              <SystemHealth user={user} onLogout={handleLogout} />
             ) : (
               <Navigate to="/" replace />
             )

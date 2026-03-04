@@ -8,6 +8,10 @@ import type {
   Controller,
   AuditLogEntry,
   AuditLogQueryParams,
+  UserInviteRequest,
+  UserInviteResponse,
+  UpdateUserRequest,
+  HealthStats,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -106,6 +110,25 @@ export const api = {
     return data;
   },
 
+  inviteUser: async (payload: UserInviteRequest): Promise<UserInviteResponse> => {
+    const { data } = await client.post<UserInviteResponse>('/admin/users/invite', payload);
+    return data;
+  },
+
+  getUser: async (userId: number): Promise<AuthUser> => {
+    const { data } = await client.get<AuthUser>(`/users/${userId}`);
+    return data;
+  },
+
+  updateUser: async (userId: number, payload: UpdateUserRequest): Promise<AuthUser> => {
+    const { data } = await client.patch<AuthUser>(`/users/${userId}`, payload);
+    return data;
+  },
+
+  deleteUser: async (userId: number) => {
+    await client.delete(`/users/${userId}`);
+  },
+
   getUserControllers: async (userId: number): Promise<UserControllerAssignment[]> => {
     const { data } = await client.get<UserControllerAssignment[]>(`/users/${userId}/controllers`, {
       headers: {
@@ -169,6 +192,11 @@ export const api = {
         before: params.before,
       },
     });
+  },
+
+  getHealth: async (): Promise<HealthStats> => {
+    const { data } = await client.get<HealthStats>('/admin/health');
+    return data;
   },
 
   createController: async (payload: { deviceId: string; label?: string }) => {

@@ -7,3 +7,4 @@ export * from './reading';
 export * from './controller';
 export * from './api';
 export * from './audit';
+export * from './health';

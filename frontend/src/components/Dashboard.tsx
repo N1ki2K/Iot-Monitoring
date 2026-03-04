@@ -8,7 +8,7 @@ import SensorCard from './SensorCard';
 import Chart from './Chart';
 import DataTable from './DataTable';
 import DeviceSelector from './DeviceSelector';
-import { isUserPrivileged } from '../utils/flags';
+import { isUserDev, isUserPrivileged } from '../utils/flags';
 
 interface DashboardProps {
   user?: AuthUser | null;
@@ -26,6 +26,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 export function Dashboard({ user, onLogout }: DashboardProps) {
   const navigate = useNavigate();
   const isAdmin = isUserPrivileged(user);
+  const isDev = isUserDev(user);
   const [selectedDevice, setSelectedDevice] = useState<string>('');
   const [latestReading, setLatestReading] = useState<Reading | null>(null);
   const [history, setHistory] = useState<Reading[]>([]);
@@ -183,16 +184,30 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
               >
                 Admin Dashboard
               </NavLink>
-              <NavLink
-                to="/audit"
-                className={({ isActive }) =>
-                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
-                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
-                  }`
-                }
-              >
-                Audit Logs
-              </NavLink>
+              {isDev && (
+                <NavLink
+                  to="/audit"
+                  className={({ isActive }) =>
+                    `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                      isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
+                    }`
+                  }
+                >
+                  Audit Logs
+                </NavLink>
+              )}
+              {isDev && (
+                <NavLink
+                  to="/health"
+                  className={({ isActive }) =>
+                    `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                      isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
+                    }`
+                  }
+                >
+                  System Health
+                </NavLink>
+              )}
             </nav>
           )}
             {!isAdmin && deviceOptions.length === 0 ? (

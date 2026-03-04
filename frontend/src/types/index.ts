@@ -9,6 +9,9 @@ export {
   type RegisterRequest,
   type UpdateProfileRequest,
   type ChangePasswordRequest,
+  type UserInviteRequest,
+  type UserInviteResponse,
+  type UpdateUserRequest,
   type UserRole,
   UserStatus,
 
@@ -36,6 +39,9 @@ export {
   // Audit types
   type AuditLogEntry,
   type AuditLogQueryParams,
+
+  // Health types
+  type HealthStats,
 } from '@iot-monitoring/shared-types';
 
 /**

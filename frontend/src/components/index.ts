@@ -8,3 +8,7 @@ export { AdminDashboard } from './AdminDashboard';
 export { AuditLogs } from './AuditLogs';
 export { ProfileMenu } from './ProfileMenu';
 export { Settings } from './Settings';
+export { UserInviteModal } from './UserInviteModal';
+export { PasswordChangeRequired } from './PasswordChangeRequired';
+export { SystemHealth } from './SystemHealth';
+export { HealthStatCard } from './HealthStatCard';

@@ -44,7 +44,7 @@
 - [ ] **Data export** - Export to CSV, Excel, PDF, JSON
 - [ ] **Bulk data operations** - Delete old data, archive readings
 - [ ] **Data annotations** - Add notes/comments to specific readings
-- [ ] **Search & filter** - Search readings by value ranges, devices
+- [x] **Search & filter** - Search readings by value ranges, devices ✓
 
 ### Real-time Features
 - [ ] **Live updates** - WebSocket connection for real-time data
@@ -68,14 +68,13 @@
 
 ### Device Management
 - [ ] **Device status dashboard** - Online/offline, last seen, battery level
-- [ ] **Device grouping** - Organize by room, building, type
 - [ ] **Device details page** - Full info, configuration, history
 - [ ] **Bulk device actions** - Update labels, remove multiple devices
 - [ ] **QR code generator** - Generate QR codes for device claiming
 
 ### Admin Features
 - [ ] **User management improvements** - Invite users, assign roles
-- [ ] **Audit log** - Track user actions and changes
+- [x] **Audit log** - Track user actions and changes ✓
 - [ ] **System health dashboard** - API stats, database size, etc.
 - [ ] **Device provisioning** - Bulk create/import devices
 - [ ] **Backup & restore** - Export/import system configuration

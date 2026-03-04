@@ -47,6 +47,8 @@ app.use((req, res, next) => {
     );
   });
   next();
+app.get("/api/health", (_req, res) => {
+  return res.status(200).json({ ok: true });
 });
 
 const pool = new Pool({

@@ -2,14 +2,28 @@ name: CI
 
 on:
   push:
-    branches: [main, develop, 'feature/**', 'Imlement-Shared-Types']
+    branches: [main, develop, "feature/**", "Imlement-Shared-Types"]
   pull_request:
     branches: [main, develop]
+  workflow_call:
 
 jobs:
-  # ============================================
-  # Shared Types Package
-  # ============================================
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      mobile: ${{ steps.filter.outputs.mobile }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            mobile:
+              - "mobile/**"
+              - ".github/workflows/ci.yml"
+
   shared-types:
     name: Shared Types
     runs-on: ubuntu-latest
@@ -20,25 +34,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: packages/shared-types/package-lock.json
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: packages/shared-types
-        run: npm ci
+        run: npm ci --workspaces
 
       - name: Type check
-        working-directory: packages/shared-types
-        run: npm run typecheck
+        run: npm run typecheck -w @iot-monitoring/shared-types
 
       - name: Build
-        working-directory: packages/shared-types
-        run: npm run build
+        run: npm run build -w @iot-monitoring/shared-types
 
-  # ============================================
-  # Frontend
-  # ============================================
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
@@ -50,41 +58,28 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: package-lock.json
 
-      - name: Install shared-types dependencies
-        working-directory: packages/shared-types
-        run: npm ci
+      - name: Install dependencies
+        run: npm ci --workspaces
 
       - name: Build shared-types
-        working-directory: packages/shared-types
-        run: npm run build
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
+        run: npm run build -w @iot-monitoring/shared-types
 
       - name: Lint
-        working-directory: frontend
-        run: npm run lint
+        run: npm run lint -w frontend
 
       - name: Type check
-        working-directory: frontend
-        run: npm run typecheck
+        run: npm run typecheck -w frontend
 
       - name: Unit tests
-        working-directory: frontend
-        run: npm run test:ci
+        run: npm run test:ci -w frontend
 
       - name: Build
-        working-directory: frontend
-        run: npm run build
+        run: npm run build -w frontend
 
-  # ============================================
-  # Backend
-  # ============================================
   backend:
     name: Backend
     runs-on: ubuntu-latest
@@ -96,44 +91,33 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: package-lock.json
 
-      - name: Install shared-types dependencies
-        working-directory: packages/shared-types
-        run: npm ci
+      - name: Install dependencies
+        run: npm ci --workspaces
 
       - name: Build shared-types
-        working-directory: packages/shared-types
-        run: npm run build
-
-      - name: Install backend dependencies
-        working-directory: backend
-        run: npm ci
+        run: npm run build -w @iot-monitoring/shared-types
 
       - name: Lint
-        working-directory: backend
-        run: npm run lint
+        run: npm run lint -w backend
 
       - name: Type check
-        working-directory: backend
-        run: npm run typecheck
+        run: npm run typecheck -w backend
 
       - name: Unit tests
-        working-directory: backend
-        run: npm run test:ci
+        run: npm run test:ci -w backend
 
       - name: Build
-        working-directory: backend
-        run: npm run build
+        run: npm run build -w backend
 
-  # ============================================
-  # Mobile App (Android)
-  # ============================================
   mobile:
     name: Mobile (Android)
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -141,8 +125,8 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: "17"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -169,9 +153,6 @@ jobs:
           path: mobile/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
 
-  # ============================================
-  # Docker Build Validation
-  # ============================================
   docker:
     name: Docker
     runs-on: ubuntu-latest
@@ -190,9 +171,6 @@ jobs:
         working-directory: infra
         run: docker compose build
 
-  # ============================================
-  # Summary Job
-  # ============================================
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
@@ -204,8 +182,8 @@ jobs:
           if [[ "${{ needs.shared-types.result }}" != "success" ]] || \
              [[ "${{ needs.frontend.result }}" != "success" ]] || \
              [[ "${{ needs.backend.result }}" != "success" ]] || \
-             [[ "${{ needs.mobile.result }}" != "success" ]] || \
-             [[ "${{ needs.docker.result }}" != "success" ]]; then
+             [[ "${{ needs.docker.result }}" != "success" ]] || \
+             [[ "${{ needs.mobile.result }}" != "success" && "${{ needs.mobile.result }}" != "skipped" ]]; then
             echo "One or more jobs failed"
             exit 1
           fi

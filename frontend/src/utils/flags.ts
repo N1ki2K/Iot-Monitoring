@@ -29,26 +29,11 @@ export function isUserAdmin(user: {
 }
 
 /**
- * Check if user has dev privileges
- */
-export function isUserDev(user: {
-  role?: string;
-  is_dev?: number | boolean | string;
-} | null | undefined): boolean {
-  if (!user) return false;
-  return (
-    user.role === 'dev' ||
-    normalizeFlag(user.is_dev)
-  );
-}
-
-/**
- * Check if user has admin or dev privileges
+ * Check if user has elevated privileges
  */
 export function isUserPrivileged(user: {
   role?: string;
   is_admin?: number | boolean | string;
-  is_dev?: number | boolean | string;
 } | null | undefined): boolean {
-  return isUserAdmin(user) || isUserDev(user);
+  return isUserAdmin(user);
 }

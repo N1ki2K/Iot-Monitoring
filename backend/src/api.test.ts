@@ -23,15 +23,6 @@ const adminRow = {
   created_at: "2024-01-01",
 };
 
-const devRow = {
-  id: 1,
-  username: "Dev",
-  email: "dev@example.com",
-  role: "dev",
-  is_dev: true,
-  created_at: "2024-01-01",
-};
-
 const userRow = {
   id: 2,
   username: "User",
@@ -69,7 +60,6 @@ describe("api endpoints", () => {
 
   it("ensureAdmin returns expected boolean", () => {
     expect(ensureAdmin({ role: "admin" })).toBe(true);
-    expect(ensureAdmin({ role: "dev" })).toBe(true);
     expect(ensureAdmin({ role: "user" })).toBe(false);
     expect(ensureAdmin(null)).toBe(false);
   });
@@ -288,8 +278,8 @@ describe("api endpoints", () => {
     expect(res.status).toBe(400);
   });
 
-  it("POST /api/admin/users/invite rejects non-dev inviting admin", async () => {
-    queryMock.mockResolvedValueOnce({ rows: [adminRow] });
+  it("POST /api/admin/users/invite rejects non-elevated inviting admin", async () => {
+    queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .post("/api/admin/users/invite")
       .set("x-user-id", "1")
@@ -306,6 +296,47 @@ describe("api endpoints", () => {
       .set("x-user-id", "1")
       .send({ username: "New", email: "new@example.com" });
     expect(res.status).toBe(409);
+  });
+
+  it("POST /api/users/refer requires auth", async () => {
+    const res = await request(app)
+      .post("/api/users/refer")
+      .send({ username: "New", email: "new@example.com" });
+    expect(res.status).toBe(401);
+  });
+
+  it("POST /api/users/refer validates payload", async () => {
+    queryMock.mockResolvedValueOnce({ rows: [userRow] });
+    const res = await request(app)
+      .post("/api/users/refer")
+      .set("x-user-id", "2")
+      .send({});
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/users/refer creates user invite", async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [userRow] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            ...userRow,
+            id: 3,
+            username: "Friend",
+            email: "friend@example.com",
+            invited_by: 2,
+            must_change_password: true,
+          },
+        ],
+      });
+    const res = await request(app)
+      .post("/api/users/refer")
+      .set("x-user-id", "2")
+      .send({ username: "Friend", email: "friend@example.com" });
+    expect(res.status).toBe(201);
+    expect(res.body.user.email).toBe("friend@example.com");
+    expect(res.body.user.role).toBe("user");
+    expect(res.body.tempPassword).toBeDefined();
   });
 
   it("GET /api/users/:id rejects non-admin", async () => {
@@ -340,8 +371,8 @@ describe("api endpoints", () => {
     expect(res.status).toBe(403);
   });
 
-  it("PATCH /api/users/:id rejects non-dev role changes", async () => {
-    queryMock.mockResolvedValueOnce({ rows: [adminRow] });
+  it("PATCH /api/users/:id rejects non-elevated role changes", async () => {
+    queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .patch("/api/users/2")
       .set("x-user-id", "1")
@@ -360,7 +391,7 @@ describe("api endpoints", () => {
 
   it("PATCH /api/users/:id updates user", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [{ ...adminRow, role: "dev", is_dev: true }] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [{ ...userRow, username: "Updated" }] });
     const res = await request(app)
       .patch("/api/users/2")
@@ -372,7 +403,7 @@ describe("api endpoints", () => {
 
   it("PATCH /api/users/:id updates is_admin field", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [devRow] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [{ ...userRow, is_admin: true }] });
     const res = await request(app)
       .patch("/api/users/2")
@@ -381,20 +412,9 @@ describe("api endpoints", () => {
     expect(res.status).toBe(200);
   });
 
-  it("PATCH /api/users/:id updates is_dev field", async () => {
-    queryMock
-      .mockResolvedValueOnce({ rows: [devRow] })
-      .mockResolvedValueOnce({ rows: [{ ...userRow, is_dev: true }] });
-    const res = await request(app)
-      .patch("/api/users/2")
-      .set("x-user-id", "1")
-      .send({ is_dev: true });
-    expect(res.status).toBe(200);
-  });
-
   it("PATCH /api/users/:id updates must_change_password field", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [devRow] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [{ ...userRow, must_change_password: true }] });
     const res = await request(app)
       .patch("/api/users/2")
@@ -439,18 +459,18 @@ describe("api endpoints", () => {
     expect(res.status).toBe(400);
   });
 
-  it("DELETE /api/users/:id blocks deleting dev without dev access", async () => {
+  it("DELETE /api/users/:id blocks deleting target without admin access", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [adminRow] })
-      .mockResolvedValueOnce({ rows: [{ ...userRow, role: "dev", is_dev: true }] });
+      .mockResolvedValueOnce({ rows: [userRow] })
+      .mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app).delete("/api/users/2").set("x-user-id", "1");
     expect(res.status).toBe(403);
   });
 
-  it("DELETE /api/users/:id allows dev to delete dev", async () => {
+  it("DELETE /api/users/:id allows admin to delete user", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [{ ...adminRow, role: "dev", is_dev: true }] })
-      .mockResolvedValueOnce({ rows: [{ ...userRow, role: "dev", is_dev: true }] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
+      .mockResolvedValueOnce({ rows: [userRow] })
       .mockResolvedValueOnce({ rows: [{ id: 2, email: "user@example.com" }] });
     const res = await request(app).delete("/api/users/2").set("x-user-id", "1");
     expect(res.status).toBe(204);
@@ -459,7 +479,7 @@ describe("api endpoints", () => {
   it("DELETE /api/users/:id deletes user", async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
-      .mockResolvedValueOnce({ rows: [{ ...userRow, role: "user", is_dev: false }] })
+      .mockResolvedValueOnce({ rows: [userRow] })
       .mockResolvedValueOnce({ rows: [{ id: 2, email: "user@example.com" }] });
     const res = await request(app).delete("/api/users/2").set("x-user-id", "1");
     expect(res.status).toBe(204);
@@ -482,8 +502,8 @@ describe("api endpoints", () => {
     expect(res.status).toBe(500);
   });
 
-  it("PATCH /api/users/:id/role rejects non-dev", async () => {
-    queryMock.mockResolvedValueOnce({ rows: [adminRow] });
+  it("PATCH /api/users/:id/role rejects non-elevated", async () => {
+    queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .patch("/api/users/2/role")
       .set("x-user-id", "1")
@@ -492,7 +512,7 @@ describe("api endpoints", () => {
   });
 
   it("PATCH /api/users/:id/role rejects invalid role", async () => {
-    queryMock.mockResolvedValueOnce({ rows: [{ ...adminRow, role: "dev", is_dev: true }] });
+    queryMock.mockResolvedValueOnce({ rows: [adminRow] });
     const res = await request(app)
       .patch("/api/users/2/role")
       .set("x-user-id", "1")
@@ -502,7 +522,7 @@ describe("api endpoints", () => {
 
   it("PATCH /api/users/:id/role updates role", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [{ ...adminRow, role: "dev", is_dev: true }] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [{ ...userRow, role: "admin" }] });
     const res = await request(app)
       .patch("/api/users/2/role")
@@ -514,7 +534,7 @@ describe("api endpoints", () => {
 
   it("PATCH /api/users/:id/role returns 404 when user not found", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [{ ...adminRow, role: "dev", is_dev: true }] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .patch("/api/users/999/role")
@@ -525,7 +545,7 @@ describe("api endpoints", () => {
 
   it("PATCH /api/users/:id/role handles database error", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [{ ...adminRow, role: "dev", is_dev: true }] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
       .mockRejectedValueOnce(new Error("db"));
     const res = await request(app)
       .patch("/api/users/2/role")
@@ -534,15 +554,15 @@ describe("api endpoints", () => {
     expect(res.status).toBe(500);
   });
 
-  it("GET /api/audit rejects non-dev", async () => {
-    queryMock.mockResolvedValueOnce({ rows: [adminRow] });
+  it("GET /api/audit rejects non-elevated", async () => {
+    queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app).get("/api/audit").set("x-user-id", "1");
     expect(res.status).toBe(403);
   });
 
   it("GET /api/audit returns paginated logs", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [{ ...adminRow, role: "dev", is_dev: true }] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [{ count: "1" }] })
       .mockResolvedValueOnce({ rows: [{ id: 1, action: "user.login", entity_type: "user" }] });
     const res = await request(app).get("/api/audit").set("x-user-id", "1");
@@ -552,7 +572,7 @@ describe("api endpoints", () => {
 
   it("GET /api/audit filters by actorId/action/entityType", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [{ ...adminRow, role: "dev", is_dev: true }] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [{ count: "0" }] })
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
@@ -564,7 +584,7 @@ describe("api endpoints", () => {
 
   it("GET /api/audit filters by entityType", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [devRow] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [{ count: "1" }] })
       .mockResolvedValueOnce({ rows: [{ id: 1 }] });
     const res = await request(app)
@@ -575,7 +595,7 @@ describe("api endpoints", () => {
 
   it("GET /api/audit filters by entityId", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [devRow] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [{ count: "1" }] })
       .mockResolvedValueOnce({ rows: [{ id: 1 }] });
     const res = await request(app)
@@ -584,21 +604,21 @@ describe("api endpoints", () => {
     expect(res.status).toBe(200);
   });
 
-  it("DELETE /api/audit rejects non-dev", async () => {
-    queryMock.mockResolvedValueOnce({ rows: [adminRow] });
+  it("DELETE /api/audit rejects non-elevated", async () => {
+    queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app).delete("/api/audit").set("x-user-id", "1");
     expect(res.status).toBe(403);
   });
 
   it("DELETE /api/audit requires before or all", async () => {
-    queryMock.mockResolvedValueOnce({ rows: [{ ...adminRow, role: "dev", is_dev: true }] });
+    queryMock.mockResolvedValueOnce({ rows: [adminRow] });
     const res = await request(app).delete("/api/audit").set("x-user-id", "1");
     expect(res.status).toBe(400);
   });
 
   it("DELETE /api/audit purges all", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [{ ...adminRow, role: "dev", is_dev: true }] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .delete("/api/audit?all=true")
@@ -608,7 +628,7 @@ describe("api endpoints", () => {
 
   it("DELETE /api/audit purges before date", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [{ ...adminRow, role: "dev", is_dev: true }] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .delete("/api/audit?before=2024-01-01T00:00:00.000Z")
@@ -618,7 +638,7 @@ describe("api endpoints", () => {
 
   it("GET /api/audit handles errors", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [devRow] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
       .mockRejectedValueOnce(new Error("db"));
     const res = await request(app).get("/api/audit").set("x-user-id", "1");
     expect(res.status).toBe(500);
@@ -626,7 +646,7 @@ describe("api endpoints", () => {
 
   it("DELETE /api/audit handles errors", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [devRow] })
+      .mockResolvedValueOnce({ rows: [adminRow] })
       .mockRejectedValueOnce(new Error("db"));
     const res = await request(app).delete("/api/audit?all=true").set("x-user-id", "1");
     expect(res.status).toBe(500);
@@ -650,13 +670,12 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [{ latest: "2024-01-01T00:00:00.000Z" }] })
       .mockResolvedValueOnce({
         rows: [
-          {
-            total: "5",
-            admins: "1",
-            devs: "1",
-            invited: "2",
-            must_change_password: "1",
-          },
+              {
+                total: "5",
+                admins: "1",
+                invited: "2",
+                must_change_password: "1",
+              },
         ],
       });
     const res = await request(app).get("/api/admin/health").set("x-user-id", "1");
@@ -681,7 +700,6 @@ describe("api endpoints", () => {
       users: expect.objectContaining({
         total: 5,
         admins: 1,
-        devs: 1,
         invited: 2,
         mustChangePassword: 1,
       }),
@@ -834,6 +852,32 @@ describe("api endpoints", () => {
       .post("/api/controllers/claim")
       .set("x-user-id", "2")
       .send({ code: "12345" });
+    expect(res.status).toBe(200);
+    expect(res.body.controller.device_id).toBe("dev1");
+  });
+
+  it("POST /api/controllers/claim accepts QR URL payload", async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [userRow] })
+      .mockResolvedValueOnce({ rows: [{ id: 1, device_id: "dev1", pairing_code: "12345" }] })
+      .mockResolvedValueOnce({});
+    const res = await request(app)
+      .post("/api/controllers/claim")
+      .set("x-user-id", "2")
+      .send({ qrData: "https://example.com/claim?pairingCode=12345" });
+    expect(res.status).toBe(200);
+    expect(res.body.controller.device_id).toBe("dev1");
+  });
+
+  it("POST /api/controllers/claim accepts QR JSON payload", async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [userRow] })
+      .mockResolvedValueOnce({ rows: [{ id: 1, device_id: "dev1", pairing_code: "12345" }] })
+      .mockResolvedValueOnce({});
+    const res = await request(app)
+      .post("/api/controllers/claim")
+      .set("x-user-id", "2")
+      .send({ qrData: "{\"pairing_code\":\"12345\"}" });
     expect(res.status).toBe(200);
     expect(res.body.controller.device_id).toBe("dev1");
   });

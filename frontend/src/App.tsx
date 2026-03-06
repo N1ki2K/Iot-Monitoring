@@ -9,13 +9,7 @@ const normalizeFlag = (value: unknown) =>
 
 const isAdminRole = (user: AuthUser) => {
   const isAdminFlag = normalizeFlag(user.is_admin);
-  const isDevFlag = normalizeFlag(user.is_dev);
-  return isAdminFlag || isDevFlag || user.role === 'admin' || user.role === 'dev';
-};
-
-const isDevRole = (user: AuthUser) => {
-  const isDevFlag = normalizeFlag(user.is_dev);
-  return isDevFlag || user.role === 'dev';
+  return isAdminFlag || user.role === 'admin';
 };
 
 function App() {
@@ -94,7 +88,7 @@ function App() {
         <Route
           path="/audit"
           element={
-            isDevRole(user) ? (
+            isAdminRole(user) ? (
               <AuditLogs user={user} onLogout={handleLogout} />
             ) : (
               <Navigate to="/" replace />
@@ -104,7 +98,7 @@ function App() {
         <Route
           path="/health"
           element={
-            isDevRole(user) ? (
+            isAdminRole(user) ? (
               <SystemHealth user={user} onLogout={handleLogout} />
             ) : (
               <Navigate to="/" replace />

@@ -1,3 +1,4 @@
+codex resume 019cb889-8c19-7023-b732-bd757547a685
 # IoT Monitoring System
 
 Real-time IoT sensor monitoring system with ESP32 devices, MQTT ingestion, and a React dashboard.

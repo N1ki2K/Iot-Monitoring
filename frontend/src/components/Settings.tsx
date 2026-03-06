@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { AuthUser, UserControllerAssignment } from '../types';
+import type { AuthUser, UserControllerAssignment, UserInviteResponse } from '../types';
 import { ProfileMenu } from './ProfileMenu';
 import { normalizeFlag } from '../utils/flags';
 
@@ -21,8 +21,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
   const navigate = useNavigate();
-  const isAdmin = user.role === 'admin' || user.role === 'dev' || normalizeFlag(user.is_admin);
-  const isDev = user.role === 'dev' || normalizeFlag(user.is_dev);
+  const isAdmin = user.role === 'admin' || normalizeFlag(user.is_admin);
   const [username, setUsername] = useState(user.username);
   const [email, setEmail] = useState(user.email);
   const [profileStatus, setProfileStatus] = useState('');
@@ -41,6 +40,11 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
 
   const [deleteError, setDeleteError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [referUsername, setReferUsername] = useState('');
+  const [referEmail, setReferEmail] = useState('');
+  const [referError, setReferError] = useState('');
+  const [referResponse, setReferResponse] = useState<UserInviteResponse | null>(null);
+  const [isReferring, setIsReferring] = useState(false);
 
   useEffect(() => {
     setUsername(user.username);
@@ -142,6 +146,32 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
     }
   };
 
+  const handleReferFriend = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setReferError('');
+    setReferResponse(null);
+    if (!referUsername.trim() || !referEmail.trim()) {
+      setReferError('Username and email are required.');
+      return;
+    }
+
+    setIsReferring(true);
+    try {
+      const response = await api.referFriend({
+        username: referUsername.trim(),
+        email: referEmail.trim(),
+      });
+      setReferResponse(response);
+      setReferUsername('');
+      setReferEmail('');
+    } catch (error) {
+      const message = getErrorMessage(error, 'Failed to send referral invite.');
+      setReferError(message);
+    } finally {
+      setIsReferring(false);
+    }
+  };
+
   return (
     <div className="min-h-screen p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -181,7 +211,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                   Admin Dashboard
                 </NavLink>
               )}
-              {isDev && (
+              {isAdmin && (
                 <NavLink
                   to="/audit"
                   className={({ isActive }) =>
@@ -193,7 +223,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                   Audit Logs
                 </NavLink>
               )}
-              {isDev && (
+              {isAdmin && (
                 <NavLink
                   to="/health"
                   className={({ isActive }) =>
@@ -245,6 +275,47 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
               {profileStatus && <span className="text-sm text-emerald-300">{profileStatus}</span>}
               {profileError && <span className="text-sm text-red-300">{profileError}</span>}
             </div>
+          </form>
+        </section>
+
+        <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
+          <div className="p-4 border-b border-slate-700/40">
+            <h3 className="text-lg font-semibold text-gray-200">Refer a Friend</h3>
+            <p className="text-sm text-gray-400 mt-1">Invite a friend to create a user account.</p>
+          </div>
+          <form className="p-4 space-y-4" onSubmit={handleReferFriend}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="text-sm text-gray-300">Friend Username</label>
+                <input
+                  className="input mt-2"
+                  placeholder="friend-user"
+                  value={referUsername}
+                  onChange={(event) => setReferUsername(event.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-300">Friend Email</label>
+                <input
+                  className="input mt-2"
+                  placeholder="friend@example.com"
+                  value={referEmail}
+                  onChange={(event) => setReferEmail(event.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button className="btn btn-primary" type="submit" disabled={isReferring}>
+                {isReferring ? 'Sending...' : 'Send Referral Invite'}
+              </button>
+              {referError && <span className="text-sm text-red-300">{referError}</span>}
+            </div>
+            {referResponse && (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+                Invite created for {referResponse.user.email}. Temporary password:{' '}
+                <span className="font-mono text-white">{referResponse.tempPassword}</span>
+              </div>
+            )}
           </form>
         </section>
 

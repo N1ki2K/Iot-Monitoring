@@ -30,7 +30,9 @@ export interface UserControllerAssignment {
  * Claim controller request payload
  */
 export interface ClaimControllerRequest {
-  code: string;
+  code?: string;
+  qrData?: string;
+  qrCode?: string;
   label?: string;
 }
 

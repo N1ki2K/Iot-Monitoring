@@ -48,7 +48,7 @@ describe("ingest service", () => {
     process.env.PGHOST = "localhost";
     process.env.PGPORT = "5432";
     process.env.PGUSER = "iot";
-    process.env.PGPASSWORD = "iotpass";
+    process.env.PGPASSWORD = "test_password_placeholder";
     process.env.PGDATABASE = "iot";
     await import("./ingest.js");
   });
@@ -89,4 +89,3 @@ describe("ingest service", () => {
     expect(queryMock).not.toHaveBeenCalled();
   });
 });
-

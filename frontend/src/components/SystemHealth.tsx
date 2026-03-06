@@ -27,7 +27,7 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
   const [data, setData] = useState<HealthStats | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const isDev = Boolean(user && (normalizeFlag(user.is_dev) || user.role === 'dev'));
+  const isAdmin = Boolean(user && (normalizeFlag(user.is_admin) || user.role === 'admin'));
 
   useEffect(() => {
     const loadHealth = async () => {
@@ -54,7 +54,7 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
     return <Navigate to="/" replace />;
   }
 
-  if (!isDev) {
+  if (!isAdmin) {
     return <Navigate to="/" replace />;
   }
 
@@ -98,7 +98,7 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
               >
                 Admin Dashboard
               </NavLink>
-              {isDev && (
+              {isAdmin && (
                 <NavLink
                   to="/audit"
                   className={({ isActive }) =>
@@ -110,7 +110,7 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
                   Audit Logs
                 </NavLink>
               )}
-              {isDev && (
+              {isAdmin && (
                 <NavLink
                   to="/health"
                   className={({ isActive }) =>
@@ -157,7 +157,6 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <HealthStatCard label="Total" value={data.users.total} />
                     <HealthStatCard label="Admins" value={data.users.admins} />
-                    <HealthStatCard label="Devs" value={data.users.devs} />
                     <HealthStatCard label="Invited" value={data.users.invited} />
                     <HealthStatCard label="Must Change" value={data.users.mustChangePassword} />
                   </div>

@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "ingest": "ts-node src/ingest.ts",
-    "api": "ts-node src/api.ts",
+    "ingest": "tsx src/ingest.ts",
+    "api": "tsx src/api.ts",
     "migrate": "tsx scripts/migrate.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",

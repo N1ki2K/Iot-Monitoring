@@ -47,6 +47,8 @@ app.use((req, res, next) => {
     );
   });
   next();
+});
+
 app.get("/api/health", (_req, res) => {
   return res.status(200).json({ ok: true });
 });
@@ -61,11 +63,55 @@ const pool = new Pool({
 
 const normalizeFlag = (value: unknown) => value === true || value === 1 || value === "1";
 
+const extractPairingCode = (raw: unknown): string | null => {
+  if (raw == null) return null;
+  if (typeof raw === "number") {
+    const code = String(raw).padStart(5, "0");
+    return /^\d{5}$/.test(code) ? code : null;
+  }
+  if (typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    return (
+      extractPairingCode(obj.code) ??
+      extractPairingCode(obj.pairing_code) ??
+      extractPairingCode(obj.pairingCode)
+    );
+  }
+  if (typeof raw !== "string") return null;
+
+  const value = raw.trim();
+  if (!value) return null;
+  if (/^\d{5}$/.test(value)) return value;
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    const parsedCode = extractPairingCode(parsed);
+    if (parsedCode) return parsedCode;
+  } catch {
+    // Not JSON; continue parsing.
+  }
+
+  try {
+    const url = new URL(value);
+    const fromQuery =
+      url.searchParams.get("code") ??
+      url.searchParams.get("pairing_code") ??
+      url.searchParams.get("pairingCode");
+    const queryCode = extractPairingCode(fromQuery);
+    if (queryCode) return queryCode;
+  } catch {
+    // Not a URL; continue parsing.
+  }
+
+  const match = value.match(/\b(\d{5})\b/);
+  return match ? match[1] : null;
+};
+
 export const getRequester = async (req: express.Request) => {
   const requesterId = Number(req.header("x-user-id"));
   if (!requesterId) return null;
   const result = await pool.query(
-    `SELECT id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at
+    `SELECT id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at
      FROM users
      WHERE id = $1`,
     [requesterId]
@@ -76,24 +122,17 @@ export const getRequester = async (req: express.Request) => {
     ...row,
     id: Number(row.id),
     is_admin: normalizeFlag(row.is_admin) ? 1 : 0,
-    is_dev: normalizeFlag(row.is_dev) ? 1 : 0,
     must_change_password: normalizeFlag(row.must_change_password),
   };
 };
 
 export const ensureAdmin = (
-  user: { role?: string; is_admin?: number; is_dev?: number } | null
+  user: { role?: string; is_admin?: number } | null
 ) =>
   Boolean(
     user &&
-      (user.role === "admin" ||
-        user.role === "dev" ||
-        user.is_admin === 1 ||
-        user.is_dev === 1)
+      (user.role === "admin" || user.is_admin === 1)
   );
-
-export const ensureDev = (user: { role?: string; is_dev?: number } | null) =>
-  Boolean(user && (user.role === "dev" || user.is_dev === 1));
 
 export const generatePairingCode = async () => {
   for (let attempt = 0; attempt < 10; attempt++) {
@@ -204,14 +243,13 @@ app.post("/api/auth/register", async (req, res) => {
     const result = await pool.query(
       `INSERT INTO users (username, email, password, role)
        VALUES ($1, $2, $3, 'user')
-       RETURNING id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at`,
+       RETURNING id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at`,
       [username, email, passwordHash]
     );
     const created = result.rows[0];
     const response = {
       ...created,
       is_admin: normalizeFlag(created.is_admin) ? 1 : 0,
-      is_dev: normalizeFlag(created.is_dev) ? 1 : 0,
       must_change_password: normalizeFlag(created.must_change_password),
     };
     await logAudit({
@@ -239,7 +277,7 @@ app.post("/api/auth/login", async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, username, email, password, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at
+      `SELECT id, username, email, password, role, is_admin, invited_by, invited_at, must_change_password, created_at
        FROM users
        WHERE email = $1`,
       [email]
@@ -259,7 +297,6 @@ app.post("/api/auth/login", async (req, res) => {
       email: user.email,
       role: user.role,
       is_admin: normalizeFlag(user.is_admin) ? 1 : 0,
-      is_dev: normalizeFlag(user.is_dev) ? 1 : 0,
       invited_by: user.invited_by ?? null,
       invited_at: user.invited_at ?? null,
       must_change_password: normalizeFlag(user.must_change_password),
@@ -302,14 +339,13 @@ app.patch("/api/me", async (req, res) => {
       `UPDATE users
        SET username = $1, email = $2
        WHERE id = $3
-       RETURNING id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at`,
+       RETURNING id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at`,
       [username, email, requester.id]
     );
     const updated = result.rows[0];
     const response = {
       ...updated,
       is_admin: normalizeFlag(updated.is_admin) ? 1 : 0,
-      is_dev: normalizeFlag(updated.is_dev) ? 1 : 0,
       must_change_password: normalizeFlag(updated.must_change_password),
     };
     await logAudit({
@@ -406,14 +442,13 @@ app.get("/api/users", async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at
+      `SELECT id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at
        FROM users
        ORDER BY created_at DESC`
     );
     const response = result.rows.map((row) => ({
       ...row,
       is_admin: normalizeFlag(row.is_admin) ? 1 : 0,
-      is_dev: normalizeFlag(row.is_dev) ? 1 : 0,
       must_change_password: normalizeFlag(row.must_change_password),
     }));
     return res.json(response);
@@ -433,11 +468,11 @@ app.post("/api/admin/users/invite", async (req, res) => {
     return res.status(400).json({ error: "username and email are required" });
   }
   const normalizedRole = role ?? "user";
-  if (!["user", "admin", "dev"].includes(normalizedRole)) {
+  if (!["user", "admin"].includes(normalizedRole)) {
     return res.status(400).json({ error: "invalid role" });
   }
-  if (normalizedRole !== "user" && !ensureDev(requester)) {
-    return res.status(403).json({ error: "dev access required to invite elevated users" });
+  if (normalizedRole !== "user" && !ensureAdmin(requester)) {
+    return res.status(403).json({ error: "admin access required to invite elevated users" });
   }
 
   try {
@@ -447,14 +482,13 @@ app.post("/api/admin/users/invite", async (req, res) => {
     const result = await pool.query(
       `INSERT INTO users (username, email, password, role, invited_by, invited_at, must_change_password)
        VALUES ($1, $2, $3, $4, $5, $6, TRUE)
-       RETURNING id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at`,
+       RETURNING id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at`,
       [username, email, passwordHash, normalizedRole, requester.id, invitedAt]
     );
     const created = result.rows[0];
     const response = {
       ...created,
       is_admin: normalizeFlag(created.is_admin) ? 1 : 0,
-      is_dev: normalizeFlag(created.is_dev) ? 1 : 0,
       must_change_password: normalizeFlag(created.must_change_password),
     };
     await logAudit({
@@ -475,6 +509,50 @@ app.post("/api/admin/users/invite", async (req, res) => {
   }
 });
 
+app.post("/api/users/refer", async (req, res) => {
+  const requester = await getRequester(req);
+  const { username, email } = req.body ?? {};
+  if (!requester) {
+    return res.status(401).json({ error: "missing user id" });
+  }
+  if (!username || !email) {
+    return res.status(400).json({ error: "username and email are required" });
+  }
+
+  try {
+    const tempPassword = generateTempPassword();
+    const passwordHash = await hashPassword(tempPassword);
+    const invitedAt = new Date();
+    const result = await pool.query(
+      `INSERT INTO users (username, email, password, role, invited_by, invited_at, must_change_password)
+       VALUES ($1, $2, $3, 'user', $4, $5, TRUE)
+       RETURNING id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at`,
+      [username, email, passwordHash, requester.id, invitedAt]
+    );
+    const created = result.rows[0];
+    const response = {
+      ...created,
+      is_admin: normalizeFlag(created.is_admin) ? 1 : 0,
+      must_change_password: normalizeFlag(created.must_change_password),
+    };
+    await logAudit({
+      req,
+      actor: { id: requester.id, email: requester.email },
+      action: "user.refer",
+      entityType: "user",
+      entityId: created.id,
+      metadata: { username, email, role: "user" },
+    });
+    return res.status(201).json({ user: response, tempPassword });
+  } catch (error) {
+    if (getErrorCode(error) === "23505") {
+      return res.status(409).json({ error: "username or email already exists" });
+    }
+    console.error("Refer user failed:", error);
+    return res.status(500).json({ error: "failed to refer user" });
+  }
+});
+
 app.get("/api/users/:userId", async (req, res) => {
   const requester = await getRequester(req);
   const userId = Number(req.params.userId);
@@ -487,7 +565,7 @@ app.get("/api/users/:userId", async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at
+      `SELECT id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at
        FROM users
        WHERE id = $1`,
       [userId]
@@ -499,7 +577,6 @@ app.get("/api/users/:userId", async (req, res) => {
     return res.json({
       ...row,
       is_admin: normalizeFlag(row.is_admin) ? 1 : 0,
-      is_dev: normalizeFlag(row.is_dev) ? 1 : 0,
       must_change_password: normalizeFlag(row.must_change_password),
     });
   } catch (error) {
@@ -511,7 +588,7 @@ app.get("/api/users/:userId", async (req, res) => {
 app.patch("/api/users/:userId", async (req, res) => {
   const requester = await getRequester(req);
   const userId = Number(req.params.userId);
-  const { username, email, role, is_admin, is_dev, must_change_password } = req.body ?? {};
+  const { username, email, role, is_admin, must_change_password } = req.body ?? {};
   if (!requester || !userId) {
     return res.status(400).json({ error: "invalid user id" });
   }
@@ -519,12 +596,12 @@ app.patch("/api/users/:userId", async (req, res) => {
     return res.status(403).json({ error: "admin access required" });
   }
   if (
-    (role !== undefined || is_admin !== undefined || is_dev !== undefined) &&
-    !ensureDev(requester)
+    (role !== undefined || is_admin !== undefined) &&
+    !ensureAdmin(requester)
   ) {
-    return res.status(403).json({ error: "dev access required for role changes" });
+    return res.status(403).json({ error: "admin access required for role changes" });
   }
-  if (role !== undefined && !["user", "admin", "dev"].includes(role)) {
+  if (role !== undefined && !["user", "admin"].includes(role)) {
     return res.status(400).json({ error: "invalid role" });
   }
 
@@ -557,12 +634,6 @@ app.patch("/api/users/:userId", async (req, res) => {
     paramIndex++;
     metadata.is_admin = Boolean(is_admin);
   }
-  if (is_dev !== undefined) {
-    updates.push(`is_dev = $${paramIndex}`);
-    params.push(Boolean(is_dev));
-    paramIndex++;
-    metadata.is_dev = Boolean(is_dev);
-  }
   if (must_change_password !== undefined) {
     updates.push(`must_change_password = $${paramIndex}`);
     params.push(Boolean(must_change_password));
@@ -579,7 +650,7 @@ app.patch("/api/users/:userId", async (req, res) => {
       `UPDATE users
        SET ${updates.join(", ")}
        WHERE id = $${paramIndex}
-       RETURNING id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at`,
+       RETURNING id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at`,
       [...params, userId]
     );
     const updated = result.rows[0];
@@ -589,7 +660,6 @@ app.patch("/api/users/:userId", async (req, res) => {
     const response = {
       ...updated,
       is_admin: normalizeFlag(updated.is_admin) ? 1 : 0,
-      is_dev: normalizeFlag(updated.is_dev) ? 1 : 0,
       must_change_password: normalizeFlag(updated.must_change_password),
     };
     await logAudit({
@@ -625,7 +695,7 @@ app.delete("/api/users/:userId", async (req, res) => {
 
   try {
     const targetResult = await pool.query(
-      `SELECT id, email, role, is_dev
+      `SELECT id, email, role
        FROM users
        WHERE id = $1`,
       [userId]
@@ -634,12 +704,6 @@ app.delete("/api/users/:userId", async (req, res) => {
     if (!target) {
       return res.status(404).json({ error: "user not found" });
     }
-    const targetIsDev =
-      target.role === "dev" || normalizeFlag(target.is_dev) ? true : false;
-    if (targetIsDev && !ensureDev(requester)) {
-      return res.status(403).json({ error: "dev access required" });
-    }
-
     const result = await pool.query(
       `DELETE FROM users WHERE id = $1 RETURNING id, email`,
       [userId]
@@ -667,10 +731,10 @@ app.patch("/api/users/:userId/role", async (req, res) => {
   if (!requester || !userId) {
     return res.status(400).json({ error: "invalid user id" });
   }
-  if (!ensureDev(requester)) {
-    return res.status(403).json({ error: "dev access required" });
+  if (!ensureAdmin(requester)) {
+    return res.status(403).json({ error: "admin access required" });
   }
-  if (!["user", "admin", "dev"].includes(role)) {
+  if (!["user", "admin"].includes(role)) {
     return res.status(400).json({ error: "invalid role" });
   }
 
@@ -679,7 +743,7 @@ app.patch("/api/users/:userId/role", async (req, res) => {
       `UPDATE users
        SET role = $1
        WHERE id = $2
-       RETURNING id, username, email, role, is_admin, is_dev, invited_by, invited_at, must_change_password, created_at`,
+       RETURNING id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at`,
       [role, userId]
     );
     const updated = result.rows[0];
@@ -689,7 +753,6 @@ app.patch("/api/users/:userId/role", async (req, res) => {
     const response = {
       ...updated,
       is_admin: normalizeFlag(updated.is_admin) ? 1 : 0,
-      is_dev: normalizeFlag(updated.is_dev) ? 1 : 0,
       must_change_password: normalizeFlag(updated.must_change_password),
     };
     await logAudit({
@@ -709,8 +772,8 @@ app.patch("/api/users/:userId/role", async (req, res) => {
 
 app.get("/api/audit", async (req, res) => {
   const requester = await getRequester(req);
-  if (!requester || !ensureDev(requester)) {
-    return res.status(403).json({ error: "dev access required" });
+  if (!requester || !ensureAdmin(requester)) {
+    return res.status(403).json({ error: "admin access required" });
   }
 
   const page = Math.max(1, Number(req.query.page) || 1);
@@ -777,8 +840,8 @@ app.get("/api/audit", async (req, res) => {
 
 app.delete("/api/audit", async (req, res) => {
   const requester = await getRequester(req);
-  if (!requester || !ensureDev(requester)) {
-    return res.status(403).json({ error: "dev access required" });
+  if (!requester || !ensureAdmin(requester)) {
+    return res.status(403).json({ error: "admin access required" });
   }
 
   const before = req.query.before as string | undefined;
@@ -841,8 +904,7 @@ app.get("/api/admin/health", async (req, res) => {
       pool.query(
         `SELECT
            COUNT(*) AS total,
-           SUM(CASE WHEN role IN ('admin', 'dev') OR LOWER(is_admin::text) IN ('t', 'true', '1') THEN 1 ELSE 0 END) AS admins,
-           SUM(CASE WHEN role = 'dev' OR LOWER(is_dev::text) IN ('t', 'true', '1') THEN 1 ELSE 0 END) AS devs,
+           SUM(CASE WHEN role = 'admin' OR LOWER(is_admin::text) IN ('t', 'true', '1') THEN 1 ELSE 0 END) AS admins,
            SUM(CASE WHEN invited_at IS NOT NULL THEN 1 ELSE 0 END) AS invited,
            SUM(CASE WHEN must_change_password THEN 1 ELSE 0 END) AS must_change_password
          FROM users`
@@ -878,7 +940,6 @@ app.get("/api/admin/health", async (req, res) => {
       users: {
         total: Number(userStats?.total ?? 0),
         admins: Number(userStats?.admins ?? 0),
-        devs: Number(userStats?.devs ?? 0),
         invited: Number(userStats?.invited ?? 0),
         mustChangePassword: Number(userStats?.must_change_password ?? 0),
       },
@@ -964,15 +1025,16 @@ app.post("/api/controllers", async (req, res) => {
 
 app.post("/api/controllers/claim", async (req, res) => {
   const requester = await getRequester(req);
-  const { code, label } = req.body ?? {};
+  const { code, qrData, qrCode, label } = req.body ?? {};
   if (!requester) {
     return res.status(401).json({ error: "missing user id" });
   }
-  if (!code) {
-    return res.status(400).json({ error: "code is required" });
-  }
-  if (!/^\d{5}$/.test(String(code))) {
-    return res.status(400).json({ error: "code must be 5 digits" });
+  const normalizedCode =
+    extractPairingCode(code) ??
+    extractPairingCode(qrData) ??
+    extractPairingCode(qrCode);
+  if (!normalizedCode) {
+    return res.status(400).json({ error: "valid 5-digit code or QR data is required" });
   }
 
   try {
@@ -980,7 +1042,7 @@ app.post("/api/controllers/claim", async (req, res) => {
       `SELECT id, device_id, label, pairing_code, created_at
        FROM controllers
        WHERE pairing_code = $1`,
-      [code]
+      [normalizedCode]
     );
     const controller = controllerResult.rows[0];
     if (!controller) {

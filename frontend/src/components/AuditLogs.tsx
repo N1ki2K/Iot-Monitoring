@@ -12,9 +12,9 @@ interface AuditLogsProps {
 const normalizeFlag = (value: unknown) =>
   value === true || value === 1 || value === '1' || value === 'true';
 
-const isDevUser = (user?: AuthUser | null) => {
+const isAdminUser = (user?: AuthUser | null) => {
   if (!user) return false;
-  return normalizeFlag(user.is_dev) || user.role === 'dev';
+  return normalizeFlag(user.is_admin) || user.role === 'admin';
 };
 
 const getErrorMessage = (error: unknown, fallback: string) => {
@@ -27,7 +27,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 export function AuditLogs({ user, onLogout }: AuditLogsProps) {
   const navigate = useNavigate();
-  const isDev = isDevUser(user);
+  const isAdmin = isAdminUser(user);
   const [auditData, setAuditData] = useState<PaginatedResponse<AuditLogEntry> | null>(null);
   const [auditError, setAuditError] = useState('');
   const [auditLoading, setAuditLoading] = useState(true);
@@ -44,7 +44,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
 
   useEffect(() => {
     const loadAuditLogs = async () => {
-      if (!isDev) return;
+      if (!isAdmin) return;
       setAuditLoading(true);
       setAuditError('');
       try {
@@ -63,7 +63,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
       }
     };
     loadAuditLogs();
-  }, [isDev, auditQuery, auditPage, auditLimit]);
+  }, [isAdmin, auditQuery, auditPage, auditLimit]);
 
   const handleAuditApply = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -116,7 +116,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
     return <Navigate to="/" replace />;
   }
 
-  if (!isDev) {
+  if (!isAdmin) {
     return <Navigate to="/" replace />;
   }
 
@@ -335,9 +335,9 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
               </table>
             </div>
 
-            {isDev && (
+            {isAdmin && (
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-slate-700/40 pt-4">
-                <div className="text-sm text-gray-400">Dev tools: purge audit log entries.</div>
+                <div className="text-sm text-gray-400">Admin tools: purge audit log entries.</div>
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                   <input
                     className="input sm:w-60"

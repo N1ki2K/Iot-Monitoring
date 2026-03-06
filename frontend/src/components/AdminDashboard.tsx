@@ -23,13 +23,7 @@ const normalizeFlag = (value: unknown) =>
 const isAdminUser = (user?: AuthUser | null) => {
   if (!user) return false;
   const isAdminFlag = normalizeFlag(user.is_admin);
-  const isDevFlag = normalizeFlag(user.is_dev);
-  return isAdminFlag || isDevFlag || user.role === 'admin' || user.role === 'dev';
-};
-
-const isDevUser = (user?: AuthUser | null) => {
-  if (!user) return false;
-  return normalizeFlag(user.is_dev) || user.role === 'dev';
+  return isAdminFlag || user.role === 'admin';
 };
 
 const getErrorMessage = (error: unknown, fallback: string) => {
@@ -43,7 +37,6 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const navigate = useNavigate();
   const isAdmin = isAdminUser(user);
-  const isDev = isDevUser(user);
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [controllers, setControllers] = useState<Controller[]>([]);
   const [availableDevices, setAvailableDevices] = useState<string[]>([]);
@@ -285,18 +278,26 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               >
                 Admin Dashboard
               </NavLink>
-              {isDev && (
-                <NavLink
-                  to="/audit"
-                  className={({ isActive }) =>
-                    `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
-                      isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
-                    }`
-                  }
-                >
-                  Audit Logs
-                </NavLink>
-              )}
+              <NavLink
+                to="/audit"
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
+                  }`
+                }
+              >
+                Audit Logs
+              </NavLink>
+              <NavLink
+                to="/health"
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
+                  }`
+                }
+              >
+                System Health
+              </NavLink>
             </nav>
             {user && (
               <ProfileMenu
@@ -357,8 +358,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   ) : (
                     users.map((row) => {
                       const isAdminFlag = normalizeFlag(row.is_admin) || row.role === 'admin';
-                      const isDevFlag = normalizeFlag(row.is_dev) || row.role === 'dev';
-                      const roleLabel = isDevFlag ? 'Dev' : isAdminFlag ? 'Admin' : 'User';
+                      const roleLabel = isAdminFlag ? 'Admin' : 'User';
                       return (
                         <tr key={row.id}>
                           <td>{row.username}</td>

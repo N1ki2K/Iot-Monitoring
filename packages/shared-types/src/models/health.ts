@@ -25,7 +25,6 @@ export interface HealthStats {
   users: {
     total: number;
     admins: number;
-    devs: number;
     invited: number;
     mustChangePassword: number;
   };

@@ -115,6 +115,14 @@ export const api = {
     return data;
   },
 
+  referFriend: async (payload: {
+    username: string;
+    email: string;
+  }): Promise<UserInviteResponse> => {
+    const { data } = await client.post<UserInviteResponse>('/users/refer', payload);
+    return data;
+  },
+
   getUser: async (userId: number): Promise<AuthUser> => {
     const { data } = await client.get<AuthUser>(`/users/${userId}`);
     return data;
@@ -208,11 +216,17 @@ export const api = {
     await client.delete(`/controllers/${controllerId}`);
   },
 
-  claimController: async (code: string, label?: string): Promise<Controller> => {
-    const { data } = await client.post<{ controller: Controller }>('/controllers/claim', {
-      code,
-      label,
-    });
+  claimController: async (
+    payload:
+      | { code?: string; qrData?: string; qrCode?: string; label?: string }
+      | string,
+    label?: string
+  ): Promise<Controller> => {
+    const requestPayload =
+      typeof payload === 'string'
+        ? { code: payload, label }
+        : payload;
+    const { data } = await client.post<{ controller: Controller }>('/controllers/claim', requestPayload);
     return data.controller;
   },
 

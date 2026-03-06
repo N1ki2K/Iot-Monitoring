@@ -1,5 +1,5 @@
 import type { AuthUser } from '../types';
-import { isUserAdmin, isUserDev } from '../utils/flags';
+import { isUserAdmin } from '../utils/flags';
 
 interface ProfileMenuProps {
   user: AuthUser;
@@ -18,9 +18,8 @@ const getInitials = (value: string) =>
 export function ProfileMenu({ user, onLogout, onSettings }: ProfileMenuProps) {
   const label = user.username || user.email;
   const initials = getInitials(label);
-  const isDev = isUserDev(user);
   const isAdmin = isUserAdmin(user);
-  const roleLabel = isDev ? 'Dev' : isAdmin ? 'Admin' : 'User';
+  const roleLabel = isAdmin ? 'Admin' : 'User';
 
   return (
     <details className="relative">

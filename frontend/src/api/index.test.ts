@@ -57,10 +57,28 @@ describe('api client', () => {
     expect(config?.headers?.['x-user-id']).toBe(42);
   });
 
+  it('injects x-client header by default', () => {
+    mockLocalStorage(JSON.stringify({ id: 42 }));
+    const config = getInterceptor()?.({ headers: {} } as AxiosRequestConfig);
+    expect(config?.headers?.['x-client']).toBe('web');
+  });
+
   it('does not override existing x-user-id header', () => {
     mockLocalStorage(JSON.stringify({ id: 42 }));
     const config = getInterceptor()?.({ headers: { 'x-user-id': 7 } } as AxiosRequestConfig);
     expect(config?.headers?.['x-user-id']).toBe(7);
+  });
+
+  it('handles invalid authUser JSON in localStorage', () => {
+    mockLocalStorage('{bad json');
+    const config = getInterceptor()?.({ headers: {} } as AxiosRequestConfig);
+    expect(config?.headers?.['x-user-id']).toBeUndefined();
+  });
+
+  it('handles missing authUser in localStorage', () => {
+    mockLocalStorage(null);
+    const config = getInterceptor()?.({ headers: {} } as AxiosRequestConfig);
+    expect(config?.headers?.['x-user-id']).toBeUndefined();
   });
 
   it('getDevices returns device list', async () => {
@@ -148,6 +166,44 @@ describe('api client', () => {
     expect(users).toHaveLength(1);
   });
 
+  it('inviteUser sends payload', async () => {
+    postMock.mockResolvedValueOnce({ data: { user: { id: 1 }, tempPassword: 'temp' } });
+    await api.inviteUser({ username: 'new', email: 'new@example.com', role: 'user' });
+    expect(postMock).toHaveBeenCalledWith('/admin/users/invite', {
+      username: 'new',
+      email: 'new@example.com',
+      role: 'user',
+    });
+  });
+
+  it('referFriend sends payload', async () => {
+    postMock.mockResolvedValueOnce({ data: { user: { id: 1 }, tempPassword: 'temp' } });
+    await api.referFriend({ username: 'friend', email: 'friend@example.com' });
+    expect(postMock).toHaveBeenCalledWith('/users/refer', {
+      username: 'friend',
+      email: 'friend@example.com',
+    });
+  });
+
+  it('getUser returns user', async () => {
+    getMock.mockResolvedValueOnce({ data: { id: 7 } });
+    const user = await api.getUser(7);
+    expect(getMock).toHaveBeenCalledWith('/users/7');
+    expect(user.id).toBe(7);
+  });
+
+  it('updateUser patches payload', async () => {
+    patchMock.mockResolvedValueOnce({ data: { id: 7 } });
+    await api.updateUser(7, { role: 'admin' });
+    expect(patchMock).toHaveBeenCalledWith('/users/7', { role: 'admin' });
+  });
+
+  it('deleteUser calls delete endpoint', async () => {
+    deleteMock.mockResolvedValueOnce({});
+    await api.deleteUser(8);
+    expect(deleteMock).toHaveBeenCalledWith('/users/8');
+  });
+
   it('getControllers returns list', async () => {
     getMock.mockResolvedValueOnce({ data: [{ id: 1 }] });
     const controllers = await api.getControllers();
@@ -160,6 +216,36 @@ describe('api client', () => {
     const devices = await api.getAvailableDevices();
     expect(getMock).toHaveBeenCalledWith('/controllers/available-devices');
     expect(devices).toEqual(['dev1']);
+  });
+
+  it('getAuditLogs sends query params', async () => {
+    getMock.mockResolvedValueOnce({ data: { data: [], pagination: {} } });
+    await api.getAuditLogs({ actorId: 3, action: 'user.login', entityType: 'user', entityId: '7' });
+    expect(getMock).toHaveBeenCalledWith('/audit', {
+      params: {
+        page: 1,
+        limit: 20,
+        actorId: 3,
+        action: 'user.login',
+        entityType: 'user',
+        entityId: '7',
+      },
+    });
+  });
+
+  it('purgeAuditLogs supports all=true', async () => {
+    deleteMock.mockResolvedValueOnce({});
+    await api.purgeAuditLogs({ all: true });
+    expect(deleteMock).toHaveBeenCalledWith('/audit', {
+      params: { all: 'true', before: undefined },
+    });
+  });
+
+  it('getHealth returns stats', async () => {
+    getMock.mockResolvedValueOnce({ data: { serverTime: 'now' } });
+    const stats = await api.getHealth();
+    expect(getMock).toHaveBeenCalledWith('/admin/health');
+    expect(stats.serverTime).toBe('now');
   });
 
   it('createController posts payload', async () => {
@@ -179,6 +265,15 @@ describe('api client', () => {
     const controller = await api.claimController('12345', 'Lab');
     expect(postMock).toHaveBeenCalledWith('/controllers/claim', { code: '12345', label: 'Lab' });
     expect(controller).toEqual({ id: 1 });
+  });
+
+  it('claimController supports QR payload', async () => {
+    postMock.mockResolvedValueOnce({ data: { controller: { id: 1 } } });
+    await api.claimController({ qrData: 'https://example.com/?pairingCode=12345', label: 'Lab' });
+    expect(postMock).toHaveBeenCalledWith('/controllers/claim', {
+      qrData: 'https://example.com/?pairingCode=12345',
+      label: 'Lab',
+    });
   });
 
   it('getMe returns current user', async () => {

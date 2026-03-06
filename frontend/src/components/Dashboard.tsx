@@ -8,7 +8,7 @@ import SensorCard from './SensorCard';
 import Chart from './Chart';
 import DataTable from './DataTable';
 import DeviceSelector from './DeviceSelector';
-import { isUserDev, isUserPrivileged } from '../utils/flags';
+import { isUserPrivileged } from '../utils/flags';
 
 interface DashboardProps {
   user?: AuthUser | null;
@@ -26,7 +26,6 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 export function Dashboard({ user, onLogout }: DashboardProps) {
   const navigate = useNavigate();
   const isAdmin = isUserPrivileged(user);
-  const isDev = isUserDev(user);
   const [selectedDevice, setSelectedDevice] = useState<string>('');
   const [latestReading, setLatestReading] = useState<Reading | null>(null);
   const [history, setHistory] = useState<Reading[]>([]);
@@ -34,7 +33,9 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showClaimModal, setShowClaimModal] = useState(false);
+  const [claimMethod, setClaimMethod] = useState<'code' | 'qr'>('code');
   const [claimCode, setClaimCode] = useState('');
+  const [claimQrData, setClaimQrData] = useState('');
   const [claimLabel, setClaimLabel] = useState('');
   const [claimError, setClaimError] = useState('');
   const [isClaiming, setIsClaiming] = useState(false);
@@ -122,14 +123,30 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     event.preventDefault();
     setClaimError('');
     const normalizedCode = claimCode.trim();
-    if (!/^\d{5}$/.test(normalizedCode)) {
-      setClaimError('Enter your 5-digit code.');
+    const normalizedQrData = claimQrData.trim();
+
+    if (claimMethod === 'code') {
+      if (!/^\d{5}$/.test(normalizedCode)) {
+        setClaimError('Enter your 5-digit code.');
+        return;
+      }
+    } else if (!normalizedQrData) {
+      setClaimError('Paste QR code content.');
       return;
     }
+
     setIsClaiming(true);
     try {
-      await api.claimController(normalizedCode, claimLabel.trim() || undefined);
+      if (claimMethod === 'code') {
+        await api.claimController(normalizedCode, claimLabel.trim() || undefined);
+      } else {
+        await api.claimController({
+          qrData: normalizedQrData,
+          label: claimLabel.trim() || undefined,
+        });
+      }
       setClaimCode('');
+      setClaimQrData('');
       setClaimLabel('');
       setShowClaimModal(false);
       await loadDevices();
@@ -184,33 +201,29 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
               >
                 Admin Dashboard
               </NavLink>
-              {isDev && (
-                <NavLink
-                  to="/audit"
-                  className={({ isActive }) =>
-                    `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
-                      isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
-                    }`
-                  }
-                >
-                  Audit Logs
-                </NavLink>
-              )}
-              {isDev && (
-                <NavLink
-                  to="/health"
-                  className={({ isActive }) =>
-                    `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
-                      isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
-                    }`
-                  }
-                >
-                  System Health
-                </NavLink>
-              )}
+              <NavLink
+                to="/audit"
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
+                  }`
+                }
+              >
+                Audit Logs
+              </NavLink>
+              <NavLink
+                to="/health"
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
+                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
+                  }`
+                }
+              >
+                System Health
+              </NavLink>
             </nav>
           )}
-            {!isAdmin && deviceOptions.length === 0 ? (
+            {!isAdmin && (
               <button
                 onClick={() => setShowClaimModal(true)}
                 className="btn btn-secondary flex items-center gap-2"
@@ -218,14 +231,13 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                 <Plus className="w-4 h-4" />
                 <span>Add Device</span>
               </button>
-            ) : (
-              <DeviceSelector
-                devices={deviceOptions}
-                selectedDevice={selectedDevice}
-                onSelect={setSelectedDevice}
-                isLoading={isLoading}
-              />
             )}
+            <DeviceSelector
+              devices={deviceOptions}
+              selectedDevice={selectedDevice}
+              onSelect={setSelectedDevice}
+              isLoading={isLoading}
+            />
 
             <button
               onClick={handleRefresh}
@@ -349,8 +361,10 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                 className="btn btn-ghost"
                 onClick={() => {
                   setShowClaimModal(false);
+                  setClaimMethod('code');
                   setClaimError('');
                   setClaimCode('');
+                  setClaimQrData('');
                   setClaimLabel('');
                 }}
               >
@@ -358,15 +372,43 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
               </button>
             </div>
             <form className="mt-6 space-y-4" onSubmit={handleClaim}>
-              <div>
-                <label className="text-sm text-gray-300">Pairing code</label>
-                <input
-                  className="input mt-2"
-                  placeholder="5-digit code"
-                  value={claimCode}
-                  onChange={(event) => setClaimCode(event.target.value)}
-                />
+              <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-800/60 p-1">
+                <button
+                  type="button"
+                  className={`btn ${claimMethod === 'code' ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setClaimMethod('code')}
+                >
+                  Pairing Code
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${claimMethod === 'qr' ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setClaimMethod('qr')}
+                >
+                  QR Code
+                </button>
               </div>
+              {claimMethod === 'code' ? (
+                <div>
+                  <label className="text-sm text-gray-300">Pairing code</label>
+                  <input
+                    className="input mt-2"
+                    placeholder="5-digit code"
+                    value={claimCode}
+                    onChange={(event) => setClaimCode(event.target.value)}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="text-sm text-gray-300">QR code content</label>
+                  <textarea
+                    className="input mt-2 min-h-24"
+                    placeholder="Paste scanned QR content (URL or JSON)"
+                    value={claimQrData}
+                    onChange={(event) => setClaimQrData(event.target.value)}
+                  />
+                </div>
+              )}
               <div>
                 <label className="text-sm text-gray-300">Device label (optional)</label>
                 <input
@@ -387,8 +429,10 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                   className="btn btn-ghost"
                   onClick={() => {
                     setShowClaimModal(false);
+                    setClaimMethod('code');
                     setClaimError('');
                     setClaimCode('');
+                    setClaimQrData('');
                     setClaimLabel('');
                   }}
                 >

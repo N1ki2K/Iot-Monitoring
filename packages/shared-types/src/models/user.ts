@@ -11,7 +11,6 @@ export interface AuthUser {
   email: string;
   role?: UserRole;
   is_admin?: number | boolean | string;
-  is_dev?: number | boolean | string;
   invited_by?: number | null;
   invited_at?: string | null;
   must_change_password?: boolean | number | string;
@@ -26,7 +25,7 @@ export type UserListItem = AuthUser;
 /**
  * User role enum
  */
-export type UserRole = 'user' | 'admin' | 'dev';
+export type UserRole = 'user' | 'admin';
 
 /**
  * User status enum (for future user management features)
@@ -95,6 +94,5 @@ export interface UpdateUserRequest {
   email?: string;
   role?: UserRole;
   is_admin?: boolean;
-  is_dev?: boolean;
   must_change_password?: boolean;
 }

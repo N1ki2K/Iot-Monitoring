@@ -39,12 +39,21 @@ client.on("message", async (topic, payload) => {
     console.warn("Invalid JSON:", payload.toString());
     return;
   }
-  // expects: { t, h, lux, sound, co2 }
+  // expects: { t, h, lux, sound, sound_dbfs, sound_est_spl, aq }
 
   await pool.query(
-    `INSERT INTO readings (device_id, temperature_c, humidity_pct, lux, sound, co2_ppm)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [deviceId, msg.t ?? null, msg.h ?? null, msg.lux ?? null, msg.sound ?? null, msg.aq ?? null]
+    `INSERT INTO readings (device_id, temperature_c, humidity_pct, lux, sound, sound_dbfs, sound_est_spl, co2_ppm)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
+      deviceId,
+      msg.t ?? null,
+      msg.h ?? null,
+      msg.lux ?? null,
+      msg.sound ?? null,
+      msg.sound_dbfs ?? null,
+      msg.sound_est_spl ?? null,
+      msg.aq ?? null,
+    ]
   );
 
   console.log("inserted", deviceId, msg);

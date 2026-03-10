@@ -9,6 +9,7 @@ import {
   Legend,
 } from 'recharts';
 import type { Reading } from '../types';
+import { getDisplayedSound } from '../utils/readings';
 
 interface ChartProps {
   data: Reading[];
@@ -77,7 +78,7 @@ export function Chart({ data, title, lines, isLoading }: ChartProps) {
       temp: parseFloat(reading.temperature_c) || 0,
       humidity: parseFloat(reading.humidity_pct) || 0,
       lux: parseFloat(reading.lux) || 0,
-      sound: reading.sound || 0,
+      sound: getDisplayedSound(reading),
       air: reading.co2_ppm || 0,
     };
   });

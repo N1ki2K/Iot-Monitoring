@@ -9,6 +9,7 @@ import Chart from './Chart';
 import DataTable from './DataTable';
 import DeviceSelector from './DeviceSelector';
 import { isUserPrivileged } from '../utils/flags';
+import { getDisplayedSound } from '../utils/readings';
 
 interface DashboardProps {
   user?: AuthUser | null;
@@ -302,8 +303,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
               <SensorCard
                 type="sound"
                 label="Sound Level"
-                value={latestReading?.sound || 0}
-                unit=""
+                value={getDisplayedSound(latestReading)}
+                unit="dB"
                 isLoading={!latestReading && isRefreshing}
               />
               <SensorCard
@@ -334,7 +335,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
               data={history}
               lines={[
                 { dataKey: 'lux', color: '#fbbf24', name: 'Light (lux)' },
-                { dataKey: 'sound', color: '#a855f7', name: 'Sound' },
+                { dataKey: 'sound', color: '#a855f7', name: 'Sound (est. dB SPL)' },
               ]}
               isLoading={!history.length && isRefreshing}
             />

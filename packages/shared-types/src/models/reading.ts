@@ -14,6 +14,8 @@ export interface Reading {
   humidity_pct: string;
   lux: string;
   sound: number;
+  sound_dbfs?: string | number | null;
+  sound_est_spl?: string | number | null;
   co2_ppm: number | null;
 }
 
@@ -28,6 +30,8 @@ export interface LatestReading {
   humidity_pct: number | null;
   lux: number | null;
   sound: number | null;
+  sound_dbfs?: string | number | null;
+  sound_est_spl?: string | number | null;
   co2_ppm: number | null;
 }
 

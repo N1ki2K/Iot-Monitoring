@@ -2,21 +2,22 @@ import { useState, useEffect, useCallback } from 'react';
 import { Search, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../api';
 import type { Reading, PaginatedResponse } from '../types';
+import { getDisplayedSound } from '../utils/readings';
 
 interface DataTableProps {
   selectedDevice?: string;
 }
 
-type SortField = 'ts' | 'device_id' | 'temperature_c' | 'humidity_pct' | 'lux' | 'sound' | 'co2_ppm';
+type SortField = 'ts' | 'device_id' | 'temperature_c' | 'humidity_pct' | 'lux' | 'sound_est_spl' | 'co2_ppm';
 type SortOrder = 'ASC' | 'DESC';
 
-const columns: Array<{ key: SortField; label: string; format?: (val: unknown) => string }> = [
+const columns: Array<{ key: SortField; label: string; format?: (val: unknown, reading: Reading) => string }> = [
   { key: 'ts', label: 'Timestamp', format: (val) => new Date(String(val)).toLocaleString() },
   { key: 'device_id', label: 'Device' },
   { key: 'temperature_c', label: 'Temp (°C)', format: (val) => Number.parseFloat(String(val)).toFixed(1) },
   { key: 'humidity_pct', label: 'Humidity (%)', format: (val) => Number.parseFloat(String(val)).toFixed(1) },
   { key: 'lux', label: 'Light (lux)', format: (val) => Number.parseFloat(String(val)).toFixed(0) },
-  { key: 'sound', label: 'Sound', format: (val) => val?.toString() || '0' },
+  { key: 'sound_est_spl', label: 'Sound (est. dB SPL)', format: (_val, reading) => getDisplayedSound(reading).toFixed(1) },
   { key: 'co2_ppm', label: 'Air Quality', format: (val) => val?.toString() || '-' },
 ];
 
@@ -137,7 +138,7 @@ export function DataTable({ selectedDevice }: DataTableProps) {
                   {columns.map((col) => (
                     <td key={col.key}>
                       {col.format
-                        ? col.format(reading[col.key as keyof Reading])
+                        ? col.format(reading[col.key as keyof Reading], reading)
                         : reading[col.key as keyof Reading]?.toString() || '-'}
                     </td>
                   ))}

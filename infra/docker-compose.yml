@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
 
   adminer:
-    image: adminer
+    image: adminer:4.8.1
     container_name: iot-adminer
     ports:
       - "8080:8080"

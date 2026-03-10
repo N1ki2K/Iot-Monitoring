@@ -16,7 +16,8 @@ export interface Reading {
   sound: number;
   sound_dbfs?: string | number | null;
   sound_est_spl?: string | number | null;
-  co2_ppm: number | null;
+  air_quality_raw: number | null;
+  air_baseline_pct?: string | number | null;
 }
 
 /**
@@ -32,7 +33,8 @@ export interface LatestReading {
   sound: number | null;
   sound_dbfs?: string | number | null;
   sound_est_spl?: string | number | null;
-  co2_ppm: number | null;
+  air_quality_raw: number | null;
+  air_baseline_pct?: string | number | null;
 }
 
 /**

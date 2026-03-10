@@ -21,6 +21,7 @@
 #define SOUND_SAMPLE_COUNT        256
 #define MIN_SOUND_DBFS            -90.0f
 #define SPL_OFFSET_DB             84.0f
+#define AIR_BASELINE_RAW          1850.0f
 
 //#define WIFI_SSID                 "PGKNMA"
 //#define WIFI_PASS                 "24071927"
@@ -148,6 +149,13 @@ float estimateSoundSpl(float soundDbFs) {
   return soundDbFs + SPL_OFFSET_DB;
 }
 
+float estimateAirBaselinePct(int airRaw) {
+
+  if (AIR_BASELINE_RAW <= 0.0f) return 0.0f;
+
+  return (airRaw / AIR_BASELINE_RAW) * 100.0f;
+}
+
 void publishSensorData() {
 
   float temperature = safeReadTemperature();
@@ -158,6 +166,7 @@ void publishSensorData() {
   int soundRaw = 0;
   float soundDbFs = readSoundDbFs(soundRaw);
   float soundEstSpl = estimateSoundSpl(soundDbFs);
+  float airBaselinePct = estimateAirBaselinePct(airRaw);
 
   Serial.println("----- SENSOR READINGS -----");
 
@@ -180,6 +189,9 @@ void publishSensorData() {
   Serial.print("Air raw: ");
   Serial.println(airRaw);
 
+  Serial.print("Air baseline %: ");
+  Serial.println(airBaselinePct, 2);
+
   Serial.print("Sound raw: ");
   Serial.println(soundRaw);
 
@@ -199,7 +211,8 @@ void publishSensorData() {
   payload += "\"sound\":" + String(soundRaw) + ",";
   payload += "\"sound_dbfs\":" + String(soundDbFs, 2) + ",";
   payload += "\"sound_est_spl\":" + String(soundEstSpl, 2) + ",";
-  payload += "\"aq\":" + String(airRaw);
+  payload += "\"aq\":" + String(airRaw) + ",";
+  payload += "\"air_baseline_pct\":" + String(airBaselinePct, 2);
 
   payload += "}";
 

@@ -10,11 +10,26 @@ import DataTable from './DataTable';
 import DeviceSelector from './DeviceSelector';
 import { isUserPrivileged } from '../utils/flags';
 import { getDisplayedSound } from '../utils/readings';
+import { getDisplayedAir } from '../utils/air';
 
 interface DashboardProps {
   user?: AuthUser | null;
   onLogout: () => void;
 }
+
+const TEMPERATURE_HUMIDITY_LINES = [
+  { dataKey: 'temp', color: '#f97316', name: 'Temperature (°C)' },
+  { dataKey: 'humidity', color: '#06b6d4', name: 'Humidity (%)' },
+] as const;
+
+const LIGHT_SOUND_AIR_LINES = [
+  { dataKey: 'lux', color: '#fbbf24', name: 'Light (lux)' },
+  { dataKey: 'sound', color: '#a855f7', name: 'Sound (est. dB SPL)' },
+  { dataKey: 'air', color: '#22c55e', name: 'Air (% baseline)' },
+] as const;
+
+const HISTORY_REFRESH_INTERVAL_MS = 30000;
+const LIVE_REFRESH_INTERVAL_MS = 5000;
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error && typeof error === 'object' && 'response' in error) {
@@ -33,6 +48,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [claimMethod, setClaimMethod] = useState<'code' | 'qr'>('code');
   const [claimCode, setClaimCode] = useState('');
@@ -87,34 +103,62 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     }
   }, [deviceOptions, selectedDevice]);
 
-  // Fetch data for selected device
+  const fetchLatestReading = useCallback(async () => {
+    if (!selectedDevice) return;
+
+    try {
+      const latest = await api.getLatest(selectedDevice);
+      setLatestReading(latest);
+      setLastUpdate(new Date());
+    } catch (error) {
+      console.error('Failed to fetch latest reading:', error);
+    }
+  }, [selectedDevice]);
+
+  const fetchHistory = useCallback(async () => {
+    if (!selectedDevice) return;
+
+    setIsHistoryLoading(true);
+    try {
+      const historyData = await api.getHistory(selectedDevice, 1);
+      setHistory(historyData);
+    } catch (error) {
+      console.error('Failed to fetch history:', error);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }, [selectedDevice]);
+
   const fetchDeviceData = useCallback(async () => {
     if (!selectedDevice) return;
 
     setIsRefreshing(true);
     try {
-      const [latest, historyData] = await Promise.all([
-        api.getLatest(selectedDevice),
-        api.getHistory(selectedDevice, 1),
-      ]);
-      setLatestReading(latest);
-      setHistory(historyData);
-      setLastUpdate(new Date());
-    } catch (error) {
-      console.error('Failed to fetch device data:', error);
+      await Promise.all([fetchLatestReading(), fetchHistory()]);
     } finally {
       setIsRefreshing(false);
     }
-  }, [selectedDevice]);
+  }, [fetchHistory, fetchLatestReading, selectedDevice]);
 
-  // Auto-refresh every 5 seconds
   useEffect(() => {
     if (!selectedDevice) return;
 
     fetchDeviceData();
-    const interval = setInterval(fetchDeviceData, 5000);
-    return () => clearInterval(interval);
   }, [selectedDevice, fetchDeviceData]);
+
+  useEffect(() => {
+    if (!selectedDevice) return;
+
+    const interval = setInterval(fetchLatestReading, LIVE_REFRESH_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [selectedDevice, fetchLatestReading]);
+
+  useEffect(() => {
+    if (!selectedDevice) return;
+
+    const interval = setInterval(fetchHistory, HISTORY_REFRESH_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [selectedDevice, fetchHistory]);
 
   const handleRefresh = () => {
     fetchDeviceData();
@@ -309,9 +353,9 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
               />
               <SensorCard
                 type="air"
-                label="Air Quality"
-                value={latestReading?.co2_ppm || 0}
-                unit=""
+                label="Air vs Baseline"
+                value={getDisplayedAir(latestReading)}
+                unit="%"
                 isLoading={!latestReading && isRefreshing}
               />
             </div>
@@ -324,20 +368,14 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
             <Chart
               title="Temperature & Humidity"
               data={history}
-              lines={[
-                { dataKey: 'temp', color: '#f97316', name: 'Temperature (°C)' },
-                { dataKey: 'humidity', color: '#06b6d4', name: 'Humidity (%)' },
-              ]}
-              isLoading={!history.length && isRefreshing}
+              lines={TEMPERATURE_HUMIDITY_LINES as unknown as Array<{ dataKey: string; color: string; name: string }>}
+              isLoading={!history.length && (isRefreshing || isHistoryLoading)}
             />
             <Chart
               title="Light & Sound Levels"
               data={history}
-              lines={[
-                { dataKey: 'lux', color: '#fbbf24', name: 'Light (lux)' },
-                { dataKey: 'sound', color: '#a855f7', name: 'Sound (est. dB SPL)' },
-              ]}
-              isLoading={!history.length && isRefreshing}
+              lines={LIGHT_SOUND_AIR_LINES as unknown as Array<{ dataKey: string; color: string; name: string }>}
+              isLoading={!history.length && (isRefreshing || isHistoryLoading)}
             />
           </section>
         )}

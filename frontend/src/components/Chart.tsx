@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import {
   LineChart,
   Line,
@@ -10,6 +11,7 @@ import {
 } from 'recharts';
 import type { Reading } from '../types';
 import { getDisplayedSound } from '../utils/readings';
+import { getDisplayedAir } from '../utils/air';
 
 interface ChartProps {
   data: Reading[];
@@ -69,7 +71,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   );
 };
 
-export function Chart({ data, title, lines, isLoading }: ChartProps) {
+export const Chart = memo(function Chart({ data, title, lines, isLoading }: ChartProps) {
   const chartData: ChartDataPoint[] = data.map((reading) => {
     const date = new Date(reading.ts);
     return {
@@ -79,7 +81,7 @@ export function Chart({ data, title, lines, isLoading }: ChartProps) {
       humidity: parseFloat(reading.humidity_pct) || 0,
       lux: parseFloat(reading.lux) || 0,
       sound: getDisplayedSound(reading),
-      air: reading.co2_ppm || 0,
+      air: getDisplayedAir(reading),
     };
   });
 
@@ -139,6 +141,6 @@ export function Chart({ data, title, lines, isLoading }: ChartProps) {
       )}
     </div>
   );
-}
+});
 
 export default Chart;

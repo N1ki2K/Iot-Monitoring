@@ -66,12 +66,12 @@ describe("ingest service", () => {
     queryMock.mockResolvedValueOnce({});
     await handlers.message?.(
       "iot/my-device/telemetry",
-      Buffer.from(JSON.stringify({ t: 21.5, h: 40, lux: 123, sound: 9, sound_dbfs: -27.4, sound_est_spl: 56.6, aq: 450 }))
+      Buffer.from(JSON.stringify({ t: 21.5, h: 40, lux: 123, sound: 9, sound_dbfs: -27.4, sound_est_spl: 56.6, aq: 450, air_baseline_pct: 98.5 }))
     );
 
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining("INSERT INTO readings"),
-      ["my-device", 21.5, 40, 123, 9, -27.4, 56.6, 450]
+      ["my-device", 21.5, 40, 123, 9, -27.4, 56.6, 450, 98.5]
     );
   });
 
@@ -80,7 +80,7 @@ describe("ingest service", () => {
     await handlers.message?.("iot/my-device/telemetry", Buffer.from(JSON.stringify({})));
     expect(queryMock).toHaveBeenCalledWith(
       expect.any(String),
-      ["my-device", null, null, null, null, null, null, null]
+      ["my-device", null, null, null, null, null, null, null, null]
     );
   });
 

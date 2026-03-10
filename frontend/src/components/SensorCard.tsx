@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Thermometer, Droplets, Sun, Volume2, Wind } from 'lucide-react';
 import type { SensorType } from '../types';
 
@@ -48,7 +49,7 @@ const sensorConfig: Record<SensorType, {
   },
 };
 
-export function SensorCard({ type, value, unit, label, isLoading }: SensorCardProps) {
+export const SensorCard = memo(function SensorCard({ type, value, unit, label, isLoading }: SensorCardProps) {
   const config = sensorConfig[type];
   const Icon = config.icon;
 
@@ -92,6 +93,6 @@ export function SensorCard({ type, value, unit, label, isLoading }: SensorCardPr
       </div>
     </div>
   );
-}
+});
 
 export default SensorCard;

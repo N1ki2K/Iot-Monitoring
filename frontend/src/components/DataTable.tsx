@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { memo, useState, useEffect, useCallback } from 'react';
 import { Search, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../api';
 import type { Reading, PaginatedResponse } from '../types';
 import { getDisplayedSound } from '../utils/readings';
+import { getDisplayedAir } from '../utils/air';
 
 interface DataTableProps {
   selectedDevice?: string;
 }
 
-type SortField = 'ts' | 'device_id' | 'temperature_c' | 'humidity_pct' | 'lux' | 'sound_est_spl' | 'co2_ppm';
+type SortField = 'ts' | 'device_id' | 'temperature_c' | 'humidity_pct' | 'lux' | 'sound_est_spl' | 'air_baseline_pct';
 type SortOrder = 'ASC' | 'DESC';
 
 const columns: Array<{ key: SortField; label: string; format?: (val: unknown, reading: Reading) => string }> = [
@@ -18,10 +19,10 @@ const columns: Array<{ key: SortField; label: string; format?: (val: unknown, re
   { key: 'humidity_pct', label: 'Humidity (%)', format: (val) => Number.parseFloat(String(val)).toFixed(1) },
   { key: 'lux', label: 'Light (lux)', format: (val) => Number.parseFloat(String(val)).toFixed(0) },
   { key: 'sound_est_spl', label: 'Sound (est. dB SPL)', format: (_val, reading) => getDisplayedSound(reading).toFixed(1) },
-  { key: 'co2_ppm', label: 'Air Quality', format: (val) => val?.toString() || '-' },
+  { key: 'air_baseline_pct', label: 'Air (% baseline)', format: (_val, reading) => getDisplayedAir(reading).toFixed(1) },
 ];
 
-export function DataTable({ selectedDevice }: DataTableProps) {
+export const DataTable = memo(function DataTable({ selectedDevice }: DataTableProps) {
   const [data, setData] = useState<PaginatedResponse<Reading> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -252,6 +253,6 @@ export function DataTable({ selectedDevice }: DataTableProps) {
       </div>
     </div>
   );
-}
+});
 
 export default DataTable;

@@ -1,6 +1,6 @@
 {
   "name": "@iot-monitoring/shared-types",
-  "version": "1.0.0",
+  "version": "1.21.6",
   "description": "Shared TypeScript types for IoT Monitoring project",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

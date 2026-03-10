@@ -18,7 +18,8 @@
 const char* WIFI_SSID = "PGKNMA";
 const char* WIFI_PASS = "24071927";
 
-const char* MQTT_HOST = "192.168.88.39";
+//const char* MQTT_HOST = "192.168.88.39";
+const char* MQTT_HOST = "192.168.88.77";
 const int   MQTT_PORT = 1883;
 
 // MQTT topics

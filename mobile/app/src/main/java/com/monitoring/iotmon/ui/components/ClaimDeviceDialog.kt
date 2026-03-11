@@ -27,6 +27,18 @@ fun ClaimDeviceDialog(
     var code by remember { mutableStateOf("") }
     var label by remember { mutableStateOf("") }
     var showQRScanner by remember { mutableStateOf(false) }
+    val colorScheme = MaterialTheme.colorScheme
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = colorScheme.primary,
+        focusedLabelColor = colorScheme.primary,
+        cursorColor = colorScheme.primary,
+        focusedTextColor = colorScheme.onSurface,
+        unfocusedTextColor = colorScheme.onSurface,
+        focusedLeadingIconColor = colorScheme.primary,
+        unfocusedLeadingIconColor = colorScheme.onSurfaceVariant,
+        unfocusedBorderColor = colorScheme.outline,
+        unfocusedLabelColor = colorScheme.onSurfaceVariant
+    )
 
     // QR Scanner Dialog
     if (showQRScanner) {
@@ -46,7 +58,7 @@ fun ClaimDeviceDialog(
                 .padding(16.dp),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = Slate800
+                containerColor = colorScheme.surface
             )
         ) {
             Column(
@@ -69,7 +81,7 @@ fun ClaimDeviceDialog(
                         Icon(
                             Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = Slate400
+                            tint = colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -79,7 +91,7 @@ fun ClaimDeviceDialog(
                 Text(
                     text = "Enter the 5-digit pairing code from your device to add it to your account.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Slate400
+                    color = colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -104,11 +116,7 @@ fun ClaimDeviceDialog(
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Number
                         ),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Cyan500,
-                            focusedLabelColor = Cyan500,
-                            cursorColor = Cyan500
-                        ),
+                        colors = fieldColors,
                         textStyle = MaterialTheme.typography.headlineSmall.copy(
                             textAlign = TextAlign.Center,
                             fontWeight = FontWeight.Bold
@@ -120,8 +128,8 @@ fun ClaimDeviceDialog(
                         onClick = { showQRScanner = true },
                         modifier = Modifier.height(56.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = Cyan500.copy(alpha = 0.2f),
-                            contentColor = Cyan500
+                            containerColor = colorScheme.primaryContainer,
+                            contentColor = colorScheme.primary
                         )
                     ) {
                         Icon(
@@ -142,11 +150,7 @@ fun ClaimDeviceDialog(
                     placeholder = { Text("e.g., Living Room Sensor") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Cyan500,
-                        focusedLabelColor = Cyan500,
-                        cursorColor = Cyan500
-                    )
+                    colors = fieldColors
                 )
 
                 // Error message
@@ -172,7 +176,7 @@ fun ClaimDeviceDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Slate400
+                            contentColor = colorScheme.onSurfaceVariant
                         )
                     ) {
                         Text("Cancel")
@@ -185,7 +189,7 @@ fun ClaimDeviceDialog(
                         modifier = Modifier.weight(1f),
                         enabled = code.length == 5 && !isLoading,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Cyan500
+                            containerColor = colorScheme.primary
                         )
                     ) {
                         if (isLoading) {

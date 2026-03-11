@@ -1,10 +1,12 @@
 package com.monitoring.iotmon.ui.components
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
+import android.content.Context
+import android.content.ContextWrapper
 import android.util.Size
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.view.ViewGroup
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -26,14 +28,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
@@ -46,6 +51,13 @@ fun QRScannerDialog(
     onCodeScanned: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val activity = remember(context) { context.findActivity() }
+    val colorScheme = MaterialTheme.colorScheme
+    val hasCameraFeature = remember(context) {
+        context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
+    }
+    var scannerError by remember { mutableStateOf<String?>(null) }
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -55,15 +67,28 @@ fun QRScannerDialog(
         )
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        hasCameraPermission = granted
+    LaunchedEffect(Unit) {
+        if (hasCameraFeature && !hasCameraPermission && activity != null) {
+            ActivityCompat.requestPermissions(
+                activity,
+                arrayOf(Manifest.permission.CAMERA),
+                CAMERA_PERMISSION_REQUEST_CODE
+            )
+        }
     }
 
-    LaunchedEffect(Unit) {
-        if (!hasCameraPermission) {
-            permissionLauncher.launch(Manifest.permission.CAMERA)
+    DisposableEffect(lifecycleOwner, context) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasCameraPermission = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.CAMERA
+                ) == PackageManager.PERMISSION_GRANTED
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -76,7 +101,7 @@ fun QRScannerDialog(
                 .fillMaxWidth(0.95f)
                 .fillMaxHeight(0.7f),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Slate900)
+            colors = CardDefaults.cardColors(containerColor = colorScheme.surface)
         ) {
             Column(
                 modifier = Modifier.fillMaxSize()
@@ -93,13 +118,13 @@ fun QRScannerDialog(
                         text = "Scan QR Code",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = colorScheme.onSurface
                     )
                     IconButton(onClick = onDismiss) {
                         Icon(
                             Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = Slate400
+                            tint = colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -112,45 +137,48 @@ fun QRScannerDialog(
                         .padding(horizontal = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (hasCameraPermission) {
+                    if (!hasCameraFeature) {
+                        ScannerMessage(
+                            icon = Icons.Default.CameraAlt,
+                            title = "Camera not available",
+                            message = "This device does not report a usable camera."
+                        )
+                    } else if (scannerError != null) {
+                        ScannerMessage(
+                            icon = Icons.Default.Close,
+                            title = "Unable to open camera",
+                            message = scannerError ?: "Unknown camera error"
+                        )
+                    } else if (hasCameraPermission) {
                         QRCameraPreview(
+                            onError = { scannerError = it },
                             onCodeScanned = { code ->
                                 onCodeScanned(code)
                                 onDismiss()
                             }
                         )
                     } else {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                Icons.Default.CameraAlt,
-                                contentDescription = null,
-                                modifier = Modifier.size(64.dp),
-                                tint = Slate400
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Camera permission required",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Color.White
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Please grant camera permission to scan QR codes",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Slate400,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Button(
-                                onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-                                colors = ButtonDefaults.buttonColors(containerColor = Cyan500)
-                            ) {
-                                Text("Grant Permission")
+                        ScannerMessage(
+                            icon = Icons.Default.CameraAlt,
+                            title = "Camera permission required",
+                            message = "Please grant camera permission to scan QR codes",
+                            action = {
+                                Button(
+                                    onClick = {
+                                        activity?.let {
+                                            ActivityCompat.requestPermissions(
+                                                it,
+                                                arrayOf(Manifest.permission.CAMERA),
+                                                CAMERA_PERMISSION_REQUEST_CODE
+                                            )
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary)
+                                ) {
+                                    Text("Grant Permission")
+                                }
                             }
-                        }
+                        )
                     }
                 }
 
@@ -158,7 +186,7 @@ fun QRScannerDialog(
                 Text(
                     text = "Point your camera at the device QR code",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Slate400,
+                    color = colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -169,18 +197,38 @@ fun QRScannerDialog(
     }
 }
 
+private const val CAMERA_PERMISSION_REQUEST_CODE = 1001
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
 @Composable
 @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 private fun QRCameraPreview(
+    onError: (String) -> Unit,
     onCodeScanned: (String) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var lastScannedCode by remember { mutableStateOf<String?>(null) }
+    val onCodeScannedState by rememberUpdatedState(onCodeScanned)
+    val onErrorState by rememberUpdatedState(onError)
 
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     val executor = remember { Executors.newSingleThreadExecutor() }
     val barcodeScanner = remember { BarcodeScanning.getClient() }
+    val previewView = remember {
+        PreviewView(context).apply {
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -188,73 +236,8 @@ private fun QRCameraPreview(
             .clip(RoundedCornerShape(12.dp))
     ) {
         AndroidView(
-            factory = { ctx ->
-                PreviewView(ctx).apply {
-                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                }
-            },
-            modifier = Modifier.fillMaxSize(),
-            update = { previewView ->
-                cameraProviderFuture.addListener({
-                    val cameraProvider = cameraProviderFuture.get()
-
-                    val preview = Preview.Builder()
-                        .build()
-                        .also {
-                            it.setSurfaceProvider(previewView.surfaceProvider)
-                        }
-
-                    val imageAnalysis = ImageAnalysis.Builder()
-                        .setTargetResolution(Size(1280, 720))
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .build()
-                        .also { analysis ->
-                            analysis.setAnalyzer(executor) { imageProxy ->
-                                val mediaImage = imageProxy.image
-                                if (mediaImage != null) {
-                                    val inputImage = InputImage.fromMediaImage(
-                                        mediaImage,
-                                        imageProxy.imageInfo.rotationDegrees
-                                    )
-
-                                    barcodeScanner.process(inputImage)
-                                        .addOnSuccessListener { barcodes ->
-                                            for (barcode in barcodes) {
-                                                val rawValue = barcode.rawValue
-                                                if (rawValue != null && rawValue != lastScannedCode) {
-                                                    // Check if it looks like a 5-digit pairing code
-                                                    val code = extractPairingCode(rawValue)
-                                                    if (code != null) {
-                                                        lastScannedCode = rawValue
-                                                        onCodeScanned(code)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        .addOnCompleteListener {
-                                            imageProxy.close()
-                                        }
-                                } else {
-                                    imageProxy.close()
-                                }
-                            }
-                        }
-
-                    val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-
-                    try {
-                        cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            cameraSelector,
-                            preview,
-                            imageAnalysis
-                        )
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }, ContextCompat.getMainExecutor(context))
-            }
+            factory = { previewView },
+            modifier = Modifier.fillMaxSize()
         )
 
         // Scanning overlay
@@ -276,9 +259,117 @@ private fun QRCameraPreview(
         }
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(lifecycleOwner, previewView) {
+        val mainExecutor = ContextCompat.getMainExecutor(context)
+        val listener = Runnable {
+            try {
+                val cameraProvider = cameraProviderFuture.get()
+                val preview = Preview.Builder()
+                    .build()
+                    .also { it.setSurfaceProvider(previewView.surfaceProvider) }
+
+                val imageAnalysis = ImageAnalysis.Builder()
+                    .setTargetResolution(Size(1280, 720))
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+                    .also { analysis ->
+                        analysis.setAnalyzer(executor) { imageProxy ->
+                            val mediaImage = imageProxy.image
+                            if (mediaImage == null) {
+                                imageProxy.close()
+                                return@setAnalyzer
+                            }
+
+                            val inputImage = InputImage.fromMediaImage(
+                                mediaImage,
+                                imageProxy.imageInfo.rotationDegrees
+                            )
+
+                            barcodeScanner.process(inputImage)
+                                .addOnSuccessListener { barcodes ->
+                                    for (barcode in barcodes) {
+                                        val rawValue = barcode.rawValue ?: continue
+                                        if (rawValue == lastScannedCode) continue
+
+                                        val code = extractPairingCode(rawValue)
+                                        if (code != null) {
+                                            lastScannedCode = rawValue
+                                            onCodeScannedState(code)
+                                            break
+                                        }
+                                    }
+                                }
+                                .addOnFailureListener { error ->
+                                    onErrorState(error.message ?: "Barcode scanner failed")
+                                }
+                                .addOnCompleteListener {
+                                    imageProxy.close()
+                                }
+                        }
+                    }
+
+                cameraProvider.unbindAll()
+                cameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    preview,
+                    imageAnalysis
+                )
+            } catch (e: Exception) {
+                onErrorState(e.message ?: "Failed to start camera preview")
+            }
+        }
+
+        cameraProviderFuture.addListener(listener, mainExecutor)
+
         onDispose {
+            try {
+                if (cameraProviderFuture.isDone) {
+                    cameraProviderFuture.get().unbindAll()
+                }
+            } catch (_: Exception) {
+            }
             barcodeScanner.close()
+            executor.shutdown()
+        }
+    }
+}
+
+@Composable
+private fun ScannerMessage(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    message: String,
+    action: (@Composable () -> Unit)? = null
+) {
+    val colorScheme = MaterialTheme.colorScheme
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = Slate400
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        if (action != null) {
+            Spacer(modifier = Modifier.height(16.dp))
+            action()
         }
     }
 }

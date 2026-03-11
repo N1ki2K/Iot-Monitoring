@@ -3,6 +3,7 @@ package com.monitoring.iotmon.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.monitoring.iotmon.data.models.AuthUser
+import com.monitoring.iotmon.data.models.UserInviteResponse
 import com.monitoring.iotmon.data.models.UserControllerAssignment
 import com.monitoring.iotmon.data.repository.IoTRepository
 import com.monitoring.iotmon.data.repository.Result
@@ -20,7 +21,9 @@ data class SettingsState(
     val isChangingPassword: Boolean = false,
     val isDeletingAccount: Boolean = false,
     val isClaimingDevice: Boolean = false,
-    val claimError: String? = null
+    val isReferringFriend: Boolean = false,
+    val claimError: String? = null,
+    val referralResponse: UserInviteResponse? = null
 )
 
 class SettingsViewModel : ViewModel() {
@@ -178,11 +181,41 @@ class SettingsViewModel : ViewModel() {
         }
     }
 
+    fun referFriend(username: String, email: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                isReferringFriend = true,
+                error = null,
+                referralResponse = null
+            )
+
+            when (val result = repository.referFriend(username, email)) {
+                is Result.Success -> {
+                    _state.value = _state.value.copy(
+                        isReferringFriend = false,
+                        successMessage = "Referral created successfully",
+                        referralResponse = result.data
+                    )
+                }
+                is Result.Error -> {
+                    _state.value = _state.value.copy(
+                        isReferringFriend = false,
+                        error = result.message
+                    )
+                }
+            }
+        }
+    }
+
     fun clearError() {
         _state.value = _state.value.copy(error = null, claimError = null)
     }
 
     fun clearSuccessMessage() {
         _state.value = _state.value.copy(successMessage = null)
+    }
+
+    fun clearReferralResponse() {
+        _state.value = _state.value.copy(referralResponse = null)
     }
 }

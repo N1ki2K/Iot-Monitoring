@@ -6,6 +6,7 @@ import androidx.work.*
 import com.monitoring.iotmon.data.api.ApiClient
 import com.monitoring.iotmon.data.preferences.UserPreferences
 import com.monitoring.iotmon.util.NotificationHelper
+import com.monitoring.iotmon.util.getDisplayedSound
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
@@ -115,7 +116,7 @@ class ThresholdWorker(
                         if (reading != null) {
                             checkTemperature(reading.temperatureC?.toFloat(), settings, deviceLabel)
                             checkHumidity(reading.humidityPct?.toFloat(), settings, deviceLabel)
-                            checkNoise(reading.sound?.toFloat(), settings, deviceLabel)
+                            checkNoise(getDisplayedSound(reading)?.toFloat(), settings, deviceLabel)
                             checkDeviceStatus(reading.ts, deviceLabel, settings)
                         }
                     }

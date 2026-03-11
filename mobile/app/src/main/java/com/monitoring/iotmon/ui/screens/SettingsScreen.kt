@@ -3,6 +3,7 @@ package com.monitoring.iotmon.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -11,7 +12,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.monitoring.iotmon.data.models.AuthUser
@@ -32,11 +35,13 @@ fun SettingsScreen(
     onDeleteAccount: () -> Unit,
     onUpdateDeviceLabel: (controllerId: Int, label: String?) -> Unit,
     onRemoveDevice: (controllerId: Int) -> Unit,
+    onReferFriend: (username: String, email: String) -> Unit,
     onToggleDarkMode: (Boolean) -> Unit,
     onToggleBiometric: (Boolean) -> Unit,
     onNotificationSettingsClick: () -> Unit,
     onClearError: () -> Unit,
-    onClearSuccess: () -> Unit
+    onClearSuccess: () -> Unit,
+    onClearReferralResponse: () -> Unit
 ) {
     var username by remember(user.username) { mutableStateOf(user.username) }
     var email by remember(user.email) { mutableStateOf(user.email) }
@@ -46,14 +51,37 @@ fun SettingsScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var editingDeviceId by remember { mutableStateOf<Int?>(null) }
     var editingLabel by remember { mutableStateOf("") }
+    var referralUsername by remember { mutableStateOf("") }
+    var referralEmail by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val colorScheme = MaterialTheme.colorScheme
+    val sectionCardColors = CardDefaults.cardColors(containerColor = colorScheme.surface)
+    val nestedCardColors = CardDefaults.cardColors(containerColor = colorScheme.surfaceVariant)
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = colorScheme.primary,
+        focusedLabelColor = colorScheme.primary,
+        cursorColor = colorScheme.primary,
+        focusedTextColor = colorScheme.onSurface,
+        unfocusedTextColor = colorScheme.onSurface,
+        focusedLeadingIconColor = colorScheme.primary,
+        unfocusedLeadingIconColor = colorScheme.onSurfaceVariant,
+        unfocusedBorderColor = colorScheme.outline,
+        unfocusedLabelColor = colorScheme.onSurfaceVariant
+    )
 
     // Show success messages
     LaunchedEffect(state.successMessage) {
         state.successMessage?.let {
             snackbarHostState.showSnackbar(it)
             onClearSuccess()
+        }
+    }
+
+    LaunchedEffect(state.referralResponse) {
+        if (state.referralResponse != null) {
+            referralUsername = ""
+            referralEmail = ""
         }
     }
 
@@ -75,12 +103,14 @@ fun SettingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Slate950
+                    containerColor = colorScheme.background,
+                    titleContentColor = colorScheme.onBackground,
+                    navigationIconContentColor = colorScheme.onBackground
                 )
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = Slate950
+        containerColor = colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -94,7 +124,7 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Slate800)
+                colors = sectionCardColors
             ) {
                 Column(
                     modifier = Modifier
@@ -115,11 +145,7 @@ fun SettingsScreen(
                         leadingIcon = { Icon(Icons.Default.Person, null) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Cyan500,
-                            focusedLabelColor = Cyan500,
-                            cursorColor = Cyan500
-                        )
+                        colors = fieldColors
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -131,11 +157,7 @@ fun SettingsScreen(
                         leadingIcon = { Icon(Icons.Default.Email, null) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Cyan500,
-                            focusedLabelColor = Cyan500,
-                            cursorColor = Cyan500
-                        )
+                        colors = fieldColors
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -145,7 +167,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !state.isUpdatingProfile &&
                                 (username != user.username || email != user.email),
-                        colors = ButtonDefaults.buttonColors(containerColor = Cyan500)
+                        colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary)
                     ) {
                         if (state.isUpdatingProfile) {
                             CircularProgressIndicator(
@@ -163,7 +185,7 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Slate800)
+                colors = sectionCardColors
             ) {
                 Column(
                     modifier = Modifier
@@ -186,7 +208,7 @@ fun SettingsScreen(
                         Text(
                             text = "No devices linked to your account",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Slate400
+                            color = colorScheme.onSurfaceVariant
                         )
                     } else {
                         state.controllers.forEach { controller ->
@@ -194,7 +216,7 @@ fun SettingsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp),
-                                colors = CardDefaults.cardColors(containerColor = Slate700)
+                                colors = nestedCardColors
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -214,7 +236,7 @@ fun SettingsScreen(
                                         Text(
                                             text = controller.deviceId,
                                             style = MaterialTheme.typography.bodySmall,
-                                            color = Slate400
+                                            color = colorScheme.onSurfaceVariant
                                         )
                                     }
 
@@ -228,7 +250,7 @@ fun SettingsScreen(
                                             Icon(
                                                 Icons.Default.Edit,
                                                 contentDescription = "Edit",
-                                                tint = Cyan500
+                                                tint = colorScheme.primary
                                             )
                                         }
                                         IconButton(
@@ -250,11 +272,112 @@ fun SettingsScreen(
                 }
             }
 
+            // Referral Section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = sectionCardColors
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "Refer a Friend",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = "Create an invite and share the temporary password securely.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = referralUsername,
+                        onValueChange = { referralUsername = it },
+                        label = { Text("Username") },
+                        leadingIcon = { Icon(Icons.Default.PersonAdd, null) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = fieldColors
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = referralEmail,
+                        onValueChange = { referralEmail = it },
+                        label = { Text("Email") },
+                        leadingIcon = { Icon(Icons.Default.Email, null) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = fieldColors
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = { onReferFriend(referralUsername.trim(), referralEmail.trim()) },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !state.isReferringFriend &&
+                            referralUsername.isNotBlank() &&
+                            referralEmail.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary)
+                    ) {
+                        if (state.isReferringFriend) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Create Referral")
+                        }
+                    }
+
+                    state.referralResponse?.let { response ->
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = SuccessColor.copy(alpha = 0.12f)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "Referral created for ${response.user.email}",
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Temporary password: ${response.tempPassword}",
+                                    color = colorScheme.onSurfaceVariant
+                                )
+                                TextButton(
+                                    onClick = onClearReferralResponse,
+                                    modifier = Modifier.align(Alignment.End)
+                                ) {
+                                    Text("Dismiss")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Appearance Section
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                colors = sectionCardColors
             ) {
                 Column(
                     modifier = Modifier
@@ -341,8 +464,8 @@ fun SettingsScreen(
                                 checked = isBiometricEnabled,
                                 onCheckedChange = onToggleBiometric,
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
-                                    checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                    checkedThumbColor = colorScheme.primary,
+                                    checkedTrackColor = colorScheme.primary.copy(alpha = 0.5f)
                                 )
                             )
                         }
@@ -354,7 +477,7 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Slate800),
+                colors = sectionCardColors,
                 onClick = onNotificationSettingsClick
             ) {
                 Row(
@@ -370,7 +493,7 @@ fun SettingsScreen(
                         Icon(
                             Icons.Default.Notifications,
                             contentDescription = null,
-                            tint = Cyan500
+                            tint = colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
@@ -398,7 +521,7 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Slate800)
+                colors = sectionCardColors
             ) {
                 Column(
                     modifier = Modifier
@@ -420,11 +543,7 @@ fun SettingsScreen(
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Cyan500,
-                            focusedLabelColor = Cyan500,
-                            cursorColor = Cyan500
-                        )
+                        colors = fieldColors
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -437,11 +556,7 @@ fun SettingsScreen(
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Cyan500,
-                            focusedLabelColor = Cyan500,
-                            cursorColor = Cyan500
-                        )
+                        colors = fieldColors
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -455,11 +570,7 @@ fun SettingsScreen(
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
                         isError = confirmPassword.isNotEmpty() && confirmPassword != newPassword,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Cyan500,
-                            focusedLabelColor = Cyan500,
-                            cursorColor = Cyan500
-                        )
+                        colors = fieldColors
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -476,7 +587,7 @@ fun SettingsScreen(
                                 currentPassword.isNotEmpty() &&
                                 newPassword.isNotEmpty() &&
                                 newPassword == confirmPassword,
-                        colors = ButtonDefaults.buttonColors(containerColor = Cyan500)
+                        colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary)
                     ) {
                         if (state.isChangingPassword) {
                             CircularProgressIndicator(
@@ -514,7 +625,7 @@ fun SettingsScreen(
                     Text(
                         text = "Deleting your account is permanent and cannot be undone.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Slate400,
+                        color = colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
 
@@ -590,7 +701,7 @@ fun SettingsScreen(
                     Text("Cancel")
                 }
             },
-            containerColor = Slate800
+            containerColor = colorScheme.surface
         )
     }
 
@@ -605,11 +716,7 @@ fun SettingsScreen(
                     onValueChange = { editingLabel = it },
                     label = { Text("Label") },
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Cyan500,
-                        focusedLabelColor = Cyan500,
-                        cursorColor = Cyan500
-                    )
+                    colors = fieldColors
                 )
             },
             confirmButton = {
@@ -618,7 +725,7 @@ fun SettingsScreen(
                         onUpdateDeviceLabel(deviceId, editingLabel.ifBlank { null })
                         editingDeviceId = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Cyan500)
+                    colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary)
                 ) {
                     Text("Save")
                 }
@@ -628,7 +735,7 @@ fun SettingsScreen(
                     Text("Cancel")
                 }
             },
-            containerColor = Slate800
+            containerColor = colorScheme.surface
         )
     }
 }

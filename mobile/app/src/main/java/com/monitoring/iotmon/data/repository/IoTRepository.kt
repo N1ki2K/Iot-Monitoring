@@ -228,6 +228,77 @@ class IoTRepository(private val api: ApiService = ApiClient.apiService) {
         }
     }
 
+    suspend fun inviteUser(username: String, email: String, role: String = "user"): Result<UserInviteResponse> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = api.inviteUser(UserInviteRequest(username, email, role))
+                if (response.isSuccessful && response.body() != null) {
+                    Result.Success(response.body()!!)
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Result.Error(errorBody ?: "Failed to invite user")
+                }
+            } catch (e: Exception) {
+                Result.Error(e.message ?: "Network error")
+            }
+        }
+
+    suspend fun referFriend(username: String, email: String): Result<UserInviteResponse> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = api.referFriend(UserInviteRequest(username, email))
+                if (response.isSuccessful && response.body() != null) {
+                    Result.Success(response.body()!!)
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Result.Error(errorBody ?: "Failed to refer friend")
+                }
+            } catch (e: Exception) {
+                Result.Error(e.message ?: "Network error")
+            }
+        }
+
+    suspend fun getUser(userId: Int): Result<AuthUser> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getUser(userId)
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error("Failed to get user")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun updateUser(userId: Int, request: UpdateUserRequest): Result<AuthUser> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = api.updateUser(userId, request)
+                if (response.isSuccessful && response.body() != null) {
+                    Result.Success(response.body()!!)
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Result.Error(errorBody ?: "Failed to update user")
+                }
+            } catch (e: Exception) {
+                Result.Error(e.message ?: "Network error")
+            }
+        }
+
+    suspend fun deleteUser(userId: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.deleteUser(userId)
+            if (response.isSuccessful) {
+                Result.Success(Unit)
+            } else {
+                Result.Error("Failed to delete user")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
     suspend fun getControllers(): Result<List<Controller>> = withContext(Dispatchers.IO) {
         try {
             val response = api.getControllers()
@@ -235,6 +306,109 @@ class IoTRepository(private val api: ApiService = ApiClient.apiService) {
                 Result.Success(response.body() ?: emptyList())
             } else {
                 Result.Error("Failed to get controllers")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun getAvailableDevices(): Result<List<String>> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getAvailableDevices()
+            if (response.isSuccessful) {
+                Result.Success(response.body() ?: emptyList())
+            } else {
+                Result.Error("Failed to get available devices")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun createController(deviceId: String, label: String?): Result<Controller> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.createController(CreateControllerRequest(deviceId, label))
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                val errorBody = response.errorBody()?.string()
+                Result.Error(errorBody ?: "Failed to create controller")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun deleteController(controllerId: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.deleteController(controllerId)
+            if (response.isSuccessful) {
+                Result.Success(Unit)
+            } else {
+                Result.Error("Failed to delete controller")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun assignController(userId: Int, controllerId: Int, label: String? = null):
+        Result<UserControllerAssignment> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.assignController(userId, AssignControllerRequest(controllerId, label))
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                val errorBody = response.errorBody()?.string()
+                Result.Error(errorBody ?: "Failed to assign controller")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun getAuditLogs(params: AuditLogQueryParams): Result<PaginatedResponse<AuditLogEntry>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = api.getAuditLogs(
+                    page = params.page,
+                    limit = params.limit,
+                    actorId = params.actorId,
+                    action = params.action,
+                    entityType = params.entityType,
+                    entityId = params.entityId
+                )
+                if (response.isSuccessful && response.body() != null) {
+                    Result.Success(response.body()!!)
+                } else {
+                    Result.Error("Failed to get audit logs")
+                }
+            } catch (e: Exception) {
+                Result.Error(e.message ?: "Network error")
+            }
+        }
+
+    suspend fun purgeAuditLogs(all: Boolean? = null, before: String? = null): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = api.purgeAuditLogs(all, before)
+                if (response.isSuccessful) {
+                    Result.Success(Unit)
+                } else {
+                    Result.Error("Failed to purge audit logs")
+                }
+            } catch (e: Exception) {
+                Result.Error(e.message ?: "Network error")
+            }
+        }
+
+    suspend fun getHealth(): Result<HealthStats> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.getHealth()
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error("Failed to get health stats")
             }
         } catch (e: Exception) {
             Result.Error(e.message ?: "Network error")

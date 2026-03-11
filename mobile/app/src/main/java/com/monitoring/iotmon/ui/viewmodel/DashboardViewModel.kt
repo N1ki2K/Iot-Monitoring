@@ -8,6 +8,7 @@ import com.monitoring.iotmon.data.models.UserControllerAssignment
 import com.monitoring.iotmon.data.preferences.UserPreferences
 import com.monitoring.iotmon.data.repository.IoTRepository
 import com.monitoring.iotmon.data.repository.Result
+import com.monitoring.iotmon.util.getDisplayedSound
 import com.monitoring.iotmon.util.NotificationHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -245,7 +246,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
             // Check noise
             if (settings.noiseAlertsEnabled) {
-                val noise = reading.sound?.toFloat()
+                val noise = getDisplayedSound(reading)?.toFloat()
                 if (noise != null) {
                     val wasInRange = lastAlertedNoise[deviceId]?.let { it <= settings.noiseHighThreshold } ?: true
                     val isOutOfRange = noise > settings.noiseHighThreshold

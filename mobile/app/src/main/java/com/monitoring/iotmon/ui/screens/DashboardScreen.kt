@@ -8,10 +8,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +34,8 @@ fun DashboardScreen(
     onRefresh: () -> Unit,
     onSettingsClick: () -> Unit,
     onAdminClick: () -> Unit,
+    onAuditLogsClick: () -> Unit,
+    onSystemHealthClick: () -> Unit,
     onClaimDevice: () -> Unit,
     onLogout: () -> Unit,
     onSensorClick: (SensorType) -> Unit = {}
@@ -41,6 +43,7 @@ fun DashboardScreen(
     var showDeviceMenu by remember { mutableStateOf(false) }
     var showProfileMenu by remember { mutableStateOf(false) }
     var showQRCode by remember { mutableStateOf(false) }
+    val colorScheme = MaterialTheme.colorScheme
 
     // QR Code Dialog
     if (showQRCode && state.selectedDevice != null && state.selectedDevicePairingCode != null) {
@@ -60,7 +63,7 @@ fun DashboardScreen(
                         Text(
                             text = "IoT Monitor",
                             fontWeight = FontWeight.Bold,
-                            color = Cyan500
+                            color = colorScheme.primary
                         )
                         if (state.lastUpdate != null) {
                             Spacer(modifier = Modifier.width(8.dp))
@@ -74,7 +77,7 @@ fun DashboardScreen(
                             Text(
                                 text = state.lastUpdate,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Slate400
+                                color = colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -85,7 +88,7 @@ fun DashboardScreen(
                         Icon(
                             Icons.Default.Refresh,
                             contentDescription = "Refresh",
-                            tint = if (state.isRefreshing) Cyan500 else Slate400
+                            tint = if (state.isRefreshing) colorScheme.primary else colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -95,7 +98,7 @@ fun DashboardScreen(
                             Icon(
                                 Icons.Default.AccountCircle,
                                 contentDescription = "Profile",
-                                tint = Cyan500,
+                                tint = colorScheme.primary,
                                 modifier = Modifier.size(32.dp)
                             )
                         }
@@ -116,13 +119,13 @@ fun DashboardScreen(
                                 Text(
                                     text = user.email,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Slate400
+                                    color = colorScheme.onSurfaceVariant
                                 )
                                 if (user.isAdmin == 1) {
                                     Text(
                                         text = "Admin",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Cyan500
+                                        color = colorScheme.primary
                                     )
                                 }
                             }
@@ -138,6 +141,28 @@ fun DashboardScreen(
                                     onClick = {
                                         showProfileMenu = false
                                         onAdminClick()
+                                    }
+                                )
+
+                                DropdownMenuItem(
+                                    text = { Text("Audit Logs") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.History, null)
+                                    },
+                                    onClick = {
+                                        showProfileMenu = false
+                                        onAuditLogsClick()
+                                    }
+                                )
+
+                                DropdownMenuItem(
+                                    text = { Text("System Health") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.MonitorHeart, null)
+                                    },
+                                    onClick = {
+                                        showProfileMenu = false
+                                        onSystemHealthClick()
                                     }
                                 )
                             }
@@ -158,7 +183,7 @@ fun DashboardScreen(
                             DropdownMenuItem(
                                 text = { Text("Logout", color = ErrorColor) },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Logout, null, tint = ErrorColor)
+                                    Icon(Icons.AutoMirrored.Filled.Logout, null, tint = ErrorColor)
                                 },
                                 onClick = {
                                     showProfileMenu = false
@@ -169,11 +194,13 @@ fun DashboardScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Slate950
+                    containerColor = colorScheme.background,
+                    titleContentColor = colorScheme.onBackground,
+                    actionIconContentColor = colorScheme.onBackground
                 )
             )
         },
-        containerColor = Slate950
+        containerColor = colorScheme.background
     ) { paddingValues ->
         if (state.isLoading && !state.isRefreshing) {
             Box(
@@ -208,10 +235,12 @@ fun DashboardScreen(
                         OutlinedButton(
                             onClick = { showDeviceMenu = true },
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = Slate200
+                                contentColor = colorScheme.onSurface
                             ),
                             border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
-                                brush = Brush.horizontalGradient(listOf(Slate600, Slate600))
+                                brush = Brush.horizontalGradient(
+                                    listOf(colorScheme.outline, colorScheme.outline)
+                                )
                             )
                         ) {
                             Icon(
@@ -247,7 +276,7 @@ fun DashboardScreen(
                                         text = {
                                             Text(
                                                 device,
-                                                color = if (device == state.selectedDevice) Cyan500
+                                                color = if (device == state.selectedDevice) colorScheme.primary
                                                 else MaterialTheme.colorScheme.onSurface
                                             )
                                         },
@@ -259,8 +288,8 @@ fun DashboardScreen(
                                             Icon(
                                                 Icons.Default.Router,
                                                 contentDescription = null,
-                                                tint = if (device == state.selectedDevice) Cyan500
-                                                else Slate400
+                                                tint = if (device == state.selectedDevice) colorScheme.primary
+                                                else colorScheme.onSurfaceVariant
                                             )
                                         }
                                     )
@@ -273,8 +302,8 @@ fun DashboardScreen(
                     FilledTonalButton(
                         onClick = onClaimDevice,
                         colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = Cyan500.copy(alpha = 0.2f),
-                            contentColor = Cyan500
+                            containerColor = colorScheme.primaryContainer,
+                            contentColor = colorScheme.primary
                         )
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
@@ -288,7 +317,7 @@ fun DashboardScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Slate800),
+                        colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceVariant),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Row(
@@ -306,7 +335,7 @@ fun DashboardScreen(
                                         when (state.deviceStatus) {
                                             DeviceStatus.ONLINE -> SuccessColor
                                             DeviceStatus.OFFLINE -> ErrorColor
-                                            DeviceStatus.UNKNOWN -> Slate400
+                                            DeviceStatus.UNKNOWN -> colorScheme.onSurfaceVariant
                                         }
                                     )
                             )
@@ -322,7 +351,7 @@ fun DashboardScreen(
                                 color = when (state.deviceStatus) {
                                     DeviceStatus.ONLINE -> SuccessColor
                                     DeviceStatus.OFFLINE -> ErrorColor
-                                    DeviceStatus.UNKNOWN -> Slate400
+                                    DeviceStatus.UNKNOWN -> colorScheme.onSurfaceVariant
                                 }
                             )
                             if (state.lastSeen != null) {
@@ -330,7 +359,7 @@ fun DashboardScreen(
                                 Text(
                                     text = "• ${state.lastSeen}",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Slate400
+                                    color = colorScheme.onSurfaceVariant
                                 )
                             }
                             Spacer(modifier = Modifier.weight(1f))
@@ -344,7 +373,7 @@ fun DashboardScreen(
                                     Icon(
                                         Icons.Default.QrCode2,
                                         contentDescription = "Share QR Code",
-                                        tint = Cyan500,
+                                        tint = colorScheme.primary,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -361,7 +390,7 @@ fun DashboardScreen(
                                 tint = when (state.deviceStatus) {
                                     DeviceStatus.ONLINE -> SuccessColor
                                     DeviceStatus.OFFLINE -> ErrorColor
-                                    DeviceStatus.UNKNOWN -> Slate400
+                                    DeviceStatus.UNKNOWN -> colorScheme.onSurfaceVariant
                                 },
                                 modifier = Modifier.size(20.dp)
                             )
@@ -374,18 +403,14 @@ fun DashboardScreen(
                 // Sensor Cards
                 if (state.latestReading != null) {
                     SensorCardsGrid(
-                        temperature = state.latestReading.temperatureC,
-                        humidity = state.latestReading.humidityPct,
-                        light = state.latestReading.lux,
-                        sound = state.latestReading.sound,
-                        airQuality = state.latestReading.co2Ppm,
+                        reading = state.latestReading,
                         onSensorClick = onSensorClick
                     )
                 } else {
                     // No data state
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Slate800),
+                        colors = CardDefaults.cardColors(containerColor = colorScheme.surface),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(
@@ -398,18 +423,18 @@ fun DashboardScreen(
                                 Icons.Default.SensorsOff,
                                 contentDescription = null,
                                 modifier = Modifier.size(48.dp),
-                                tint = Slate400
+                                tint = colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 text = "No sensor data",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = Slate400
+                                color = colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = "Waiting for device to send data...",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Slate600
+                                color = colorScheme.onSurfaceVariant
                             )
                         }
                     }

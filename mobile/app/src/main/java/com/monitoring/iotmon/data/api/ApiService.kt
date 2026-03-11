@@ -30,6 +30,24 @@ interface ApiService {
     @GET("users")
     suspend fun getUsers(): Response<List<AuthUser>>
 
+    @POST("admin/users/invite")
+    suspend fun inviteUser(@Body request: UserInviteRequest): Response<UserInviteResponse>
+
+    @POST("users/refer")
+    suspend fun referFriend(@Body request: UserInviteRequest): Response<UserInviteResponse>
+
+    @GET("users/{userId}")
+    suspend fun getUser(@Path("userId") userId: Int): Response<AuthUser>
+
+    @PATCH("users/{userId}")
+    suspend fun updateUser(
+        @Path("userId") userId: Int,
+        @Body request: UpdateUserRequest
+    ): Response<AuthUser>
+
+    @DELETE("users/{userId}")
+    suspend fun deleteUser(@Path("userId") userId: Int): Response<Unit>
+
     // Devices
     @GET("devices")
     suspend fun getDevices(): Response<List<String>>
@@ -68,6 +86,25 @@ interface ApiService {
 
     @DELETE("controllers/{controllerId}")
     suspend fun deleteController(@Path("controllerId") controllerId: Int): Response<Unit>
+
+    @GET("audit")
+    suspend fun getAuditLogs(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20,
+        @Query("actorId") actorId: Int? = null,
+        @Query("action") action: String? = null,
+        @Query("entityType") entityType: String? = null,
+        @Query("entityId") entityId: String? = null
+    ): Response<PaginatedResponse<AuditLogEntry>>
+
+    @DELETE("audit")
+    suspend fun purgeAuditLogs(
+        @Query("all") all: Boolean? = null,
+        @Query("before") before: String? = null
+    ): Response<Unit>
+
+    @GET("admin/health")
+    suspend fun getHealth(): Response<HealthStats>
 
     // User Controllers
     @GET("users/{userId}/controllers")

@@ -59,6 +59,7 @@ fun NotificationSettingsScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val colorScheme = MaterialTheme.colorScheme
 
     fun checkPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -96,11 +97,7 @@ fun NotificationSettingsScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Slate950, Slate900)
-                )
-            )
+            .background(colorScheme.background)
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
@@ -119,8 +116,9 @@ fun NotificationSettingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Slate950,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                    containerColor = colorScheme.background,
+                    titleContentColor = colorScheme.onBackground,
+                    navigationIconContentColor = colorScheme.onBackground
                 )
             )
 
@@ -135,7 +133,7 @@ fun NotificationSettingsScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Slate800)
+                    colors = CardDefaults.cardColors(containerColor = colorScheme.surface)
                 ) {
                     Row(
                         modifier = Modifier
@@ -151,7 +149,7 @@ fun NotificationSettingsScreen(
                             Icon(
                                 Icons.Default.Notifications,
                                 contentDescription = null,
-                                tint = Cyan500
+                                tint = colorScheme.primary
                             )
                             Column {
                                 Text(
@@ -182,8 +180,8 @@ fun NotificationSettingsScreen(
                                 }
                             },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Cyan500,
-                                checkedTrackColor = Cyan500.copy(alpha = 0.5f)
+                                checkedThumbColor = colorScheme.primary,
+                                checkedTrackColor = colorScheme.primary.copy(alpha = 0.5f)
                             )
                         )
                     }
@@ -305,7 +303,7 @@ fun NotificationSettingsScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Slate800)
+                    colors = CardDefaults.cardColors(containerColor = colorScheme.surface)
                 ) {
                     Row(
                         modifier = Modifier
@@ -321,19 +319,19 @@ fun NotificationSettingsScreen(
                             Icon(
                                 Icons.Default.WifiOff,
                                 contentDescription = null,
-                                tint = if (state.notificationsEnabled) ErrorColor else Slate600
+                                tint = if (state.notificationsEnabled) ErrorColor else colorScheme.outline
                             )
                             Column {
                                 Text(
                                     text = "Device Offline Alerts",
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium,
-                                    color = if (state.notificationsEnabled) MaterialTheme.colorScheme.onSurface else Slate600
+                                    color = if (state.notificationsEnabled) colorScheme.onSurface else colorScheme.outline
                                 )
                                 Text(
                                     text = "Notify when a device goes offline",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (state.notificationsEnabled) MaterialTheme.colorScheme.onSurfaceVariant else Slate600
+                                    color = if (state.notificationsEnabled) colorScheme.onSurfaceVariant else colorScheme.outline
                                 )
                             }
                         }
@@ -367,7 +365,7 @@ private fun ThresholdSection(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Slate800)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier
@@ -387,13 +385,13 @@ private fun ThresholdSection(
                     Icon(
                         icon,
                         contentDescription = null,
-                        tint = if (masterEnabled) Cyan500 else Slate600
+                        tint = if (masterEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                     )
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (masterEnabled) MaterialTheme.colorScheme.onSurface else Slate600
+                        color = if (masterEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
                     )
                 }
                 Switch(
@@ -401,8 +399,8 @@ private fun ThresholdSection(
                     onCheckedChange = onToggle,
                     enabled = masterEnabled,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = Cyan500,
-                        checkedTrackColor = Cyan500.copy(alpha = 0.5f)
+                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                     )
                 )
             }
@@ -440,7 +438,7 @@ private fun ThresholdSlider(
                 text = "${value.toInt()}$unit",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
-                color = Cyan500
+                color = MaterialTheme.colorScheme.primary
             )
         }
         Slider(
@@ -449,9 +447,9 @@ private fun ThresholdSlider(
             valueRange = range,
             onValueChangeFinished = onValueChangeFinished,
             colors = SliderDefaults.colors(
-                thumbColor = Cyan500,
-                activeTrackColor = Cyan500,
-                inactiveTrackColor = Slate600
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = MaterialTheme.colorScheme.outline
             )
         )
     }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { UserInviteRequest, UserInviteResponse, UserRole } from '../types';
-import { useI18n } from '../i18n';
+import { useI18n } from '../useI18n';
 
 interface UserInviteModalProps {
   isOpen: boolean;

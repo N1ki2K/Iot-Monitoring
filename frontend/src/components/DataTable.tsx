@@ -4,7 +4,7 @@ import { api } from '../api';
 import type { Reading, PaginatedResponse } from '../types';
 import { getDisplayedSound } from '../utils/readings';
 import { getDisplayedAir } from '../utils/air';
-import { useI18n } from '../i18n';
+import { useI18n } from '../useI18n';
 
 interface DataTableProps {
   selectedDevice?: string;

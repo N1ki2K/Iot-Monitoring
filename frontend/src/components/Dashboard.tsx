@@ -11,7 +11,7 @@ import DeviceSelector from './DeviceSelector';
 import { isUserPrivileged } from '../utils/flags';
 import { getDisplayedSound } from '../utils/readings';
 import { getDisplayedAir } from '../utils/air';
-import { useI18n } from '../i18n';
+import { useI18n } from '../useI18n';
 
 interface DashboardProps {
   user?: AuthUser | null;
@@ -86,7 +86,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedDevice, user]);
+  }, [isAdmin, selectedDevice, user]);
 
   useEffect(() => {
     loadDevices();

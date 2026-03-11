@@ -3,7 +3,7 @@ import { NavLink, Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { AuthUser, AuditLogEntry, AuditLogQueryParams, PaginatedResponse } from '../types';
 import { ProfileMenu } from './ProfileMenu';
-import { useI18n } from '../i18n';
+import { useI18n } from '../useI18n';
 
 interface AuditLogsProps {
   user?: AuthUser | null;
@@ -65,7 +65,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
       }
     };
     loadAuditLogs();
-  }, [isAdmin, auditQuery, auditPage, auditLimit]);
+  }, [isAdmin, auditQuery, auditPage, auditLimit, t]);
 
   const handleAuditApply = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

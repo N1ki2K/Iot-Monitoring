@@ -4,7 +4,7 @@ import { api } from '../api';
 import type { AuthUser, UserControllerAssignment, UserInviteResponse } from '../types';
 import { ProfileMenu } from './ProfileMenu';
 import { normalizeFlag } from '../utils/flags';
-import { useI18n } from '../i18n';
+import { useI18n } from '../useI18n';
 
 interface SettingsProps {
   user: AuthUser;
@@ -73,7 +73,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
       }
     };
     loadAssignments();
-  }, [user.id]);
+  }, [t, user.id]);
 
   const handleProfileSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

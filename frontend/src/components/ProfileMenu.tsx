@@ -1,7 +1,7 @@
 import type { AuthUser } from '../types';
 import { isUserAdmin } from '../utils/flags';
-import { useI18n } from '../i18n';
-import { useTheme } from '../theme';
+import { useI18n } from '../useI18n';
+import { useTheme } from '../useTheme';
 
 interface ProfileMenuProps {
   user: AuthUser;

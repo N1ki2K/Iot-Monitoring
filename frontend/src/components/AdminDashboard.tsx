@@ -11,7 +11,7 @@ import type {
 } from '../types';
 import { ProfileMenu } from './ProfileMenu';
 import { UserInviteModal } from './UserInviteModal';
-import { useI18n } from '../i18n';
+import { useI18n } from '../useI18n';
 
 interface AdminDashboardProps {
   user?: AuthUser | null;
@@ -80,7 +80,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       }
     };
     loadUsers();
-  }, [isAdmin]);
+  }, [isAdmin, t]);
 
   useEffect(() => {
     const loadControllers = async () => {
@@ -98,7 +98,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       }
     };
     loadControllers();
-  }, [isAdmin]);
+  }, [isAdmin, t]);
 
   useEffect(() => {
     const loadAssignments = async () => {
@@ -115,7 +115,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       }
     };
     loadAssignments();
-  }, [selectedUserId]);
+  }, [selectedUserId, t]);
 
   const resetInviteState = () => {
     setInviteForm({ username: '', email: '', role: 'user' });

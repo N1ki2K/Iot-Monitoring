@@ -4,7 +4,7 @@ import { api } from '../api';
 import type { AuthUser, HealthStats } from '../types';
 import { ProfileMenu } from './ProfileMenu';
 import { HealthStatCard } from './HealthStatCard';
-import { useI18n } from '../i18n';
+import { useI18n } from '../useI18n';
 
 interface SystemHealthProps {
   user?: AuthUser | null;
@@ -50,7 +50,7 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
       }
     };
     loadHealth();
-  }, [user]);
+  }, [t, user]);
 
   if (!user) {
     return <Navigate to="/" replace />;

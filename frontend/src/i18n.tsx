@@ -1,22 +1,10 @@
 import {
-  createContext,
-  useContext,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
-
-export type Language = 'en' | 'bg';
-
-type TranslationParams = Record<string, string | number>;
-
-interface I18nContextValue {
-  language: Language;
-  locale: string;
-  setLanguage: (language: Language) => void;
-  t: (key: string, params?: TranslationParams) => string;
-}
+import { I18nContext, type Language, type TranslationParams } from './useI18n';
 
 const LANGUAGE_STORAGE_KEY = 'appLanguage';
 
@@ -526,8 +514,6 @@ const localeMap: Record<Language, string> = {
   bg: 'bg-BG',
 };
 
-const I18nContext = createContext<I18nContextValue | null>(null);
-
 const getStoredLanguage = (): Language => {
   if (typeof window === 'undefined') return 'en';
   const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
@@ -566,12 +552,4 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
-}
-
-export function useI18n() {
-  const context = useContext(I18nContext);
-  if (!context) {
-    throw new Error('useI18n must be used within an I18nProvider');
-  }
-  return context;
 }

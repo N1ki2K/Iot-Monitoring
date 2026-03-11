@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Shield, ArrowRight } from 'lucide-react';
 import { api } from '../api';
 import type { AuthUser } from '../types';
-import { useI18n } from '../i18n';
+import { useI18n } from '../useI18n';
 
 type AuthMode = 'login' | 'register';
 

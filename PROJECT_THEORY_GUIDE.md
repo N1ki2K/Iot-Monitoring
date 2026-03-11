@@ -93,7 +93,6 @@ Iot-Monitoring/
 │   ├── sql/
 │   │   ├── 001_create_audit_logs.sql
 │   │   ├── 002_add_user_role.sql
-│   │   ├── 003_add_user_is_dev.sql
 │   │   ├── 004_add_user_is_admin.sql
 │   │   ├── 005_add_user_invite_fields.sql
 │   │   ├── 006_add_sound_dbfs.sql
@@ -376,7 +375,7 @@ ESP32 device
 
 The ESP32 reads sensor values and publishes JSON telemetry to the MQTT topic:
 
-`iot/shrek-esp32/telemetry`
+`iot/esp32/telemetry`
 
 The current firmware sends:
 
@@ -677,7 +676,6 @@ Stores user accounts and access data. Important fields include:
 - `password`
 - `role`
 - `is_admin`
-- `is_dev`
 - `invited_by`
 - `invited_at`
 - `must_change_password`

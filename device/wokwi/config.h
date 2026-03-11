@@ -12,10 +12,10 @@
 #define MQTT_PORT 1883
 
 // MQTT Topic
-#define MQTT_TOPIC "iot/shrek-esp32/telemetry"
+#define MQTT_TOPIC "iot/esp32/telemetry"
 
 // Device ID (extracted from topic, but can override)
-#define DEVICE_ID "shrek-esp32"
+#define DEVICE_ID "esp32"
 
 // Sensor Pins
 #define PIN_DHT   15

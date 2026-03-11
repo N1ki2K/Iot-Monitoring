@@ -34,8 +34,8 @@
 #define MQTT_PORT                 1883
 
 // MQTT topics
-#define TOPIC_STATUS              "iot/shrek-esp32/status"
-#define TOPIC_DATA                "iot/shrek-esp32/telemetry"
+#define TOPIC_STATUS              "iot/esp32/status"
+#define TOPIC_DATA                "iot/esp32/telemetry"
 
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);

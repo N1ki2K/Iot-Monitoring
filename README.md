@@ -35,13 +35,13 @@ Iot-Monitoring/
 │   ├── sql/
 │   │   ├── 001_create_audit_logs.sql
 │   │   ├── 002_add_user_role.sql
-│   │   ├── 003_add_user_is_dev.sql
 │   │   ├── 004_add_user_is_admin.sql
 │   │   ├── 005_add_user_invite_fields.sql
 │   │   ├── 006_add_sound_dbfs.sql
 │   │   ├── 007_add_sound_est_spl.sql
 │   │   ├── 008_add_air_baseline_pct.sql
-│   │   └── 009_rename_co2_ppm_to_air_quality_raw.sql
+│   │   ├── 009_rename_co2_ppm_to_air_quality_raw.sql
+│   │   └── 010_drop_legacy_user_flag.sql
 │   └── src/
 │       ├── api.ts
 │       ├── api.test.ts
@@ -174,7 +174,7 @@ PGDATABASE=iot
 
 # MQTT
 MQTT_URL=mqtt://127.0.0.1:1883
-MQTT_TOPIC=iot/shrek-esp32/telemetry
+MQTT_TOPIC=iot/esp32/telemetry
 
 # API
 PORT=3000
@@ -255,7 +255,6 @@ CREATE TABLE IF NOT EXISTS users (
   password TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'user',
   is_admin BOOLEAN NOT NULL DEFAULT FALSE,
-  is_dev BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW()
 );
 

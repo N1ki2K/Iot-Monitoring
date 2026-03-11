@@ -18,14 +18,14 @@ interface DashboardProps {
 }
 
 const TEMPERATURE_HUMIDITY_LINES = [
-  { dataKey: 'temp', color: '#f97316', name: 'Temperature (°C)' },
-  { dataKey: 'humidity', color: '#06b6d4', name: 'Humidity (%)' },
+  { dataKey: 'temp', color: '#f97316', name: 'Temperature (°C)', yAxisId: 'left' },
+  { dataKey: 'humidity', color: '#06b6d4', name: 'Humidity (%)', yAxisId: 'right' },
 ] as const;
 
 const LIGHT_SOUND_AIR_LINES = [
-  { dataKey: 'lux', color: '#fbbf24', name: 'Light (lux)' },
-  { dataKey: 'sound', color: '#a855f7', name: 'Sound (est. dB SPL)' },
-  { dataKey: 'air', color: '#22c55e', name: 'Air (% baseline)' },
+  { dataKey: 'lux', color: '#fbbf24', name: 'Light (lux)', yAxisId: 'left' },
+  { dataKey: 'sound', color: '#a855f7', name: 'Sound (est. dB SPL)', yAxisId: 'right' },
+  { dataKey: 'air', color: '#22c55e', name: 'Air Quality (% baseline)', yAxisId: 'right' },
 ] as const;
 
 const HISTORY_REFRESH_INTERVAL_MS = 30000;
@@ -368,13 +368,13 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
             <Chart
               title="Temperature & Humidity"
               data={history}
-              lines={TEMPERATURE_HUMIDITY_LINES as unknown as Array<{ dataKey: string; color: string; name: string }>}
+              lines={TEMPERATURE_HUMIDITY_LINES as unknown as Array<{ dataKey: string; color: string; name: string; yAxisId?: 'left' | 'right' }>}
               isLoading={!history.length && (isRefreshing || isHistoryLoading)}
             />
             <Chart
-              title="Light & Sound Levels"
+              title="Light, Sound & Air Quality"
               data={history}
-              lines={LIGHT_SOUND_AIR_LINES as unknown as Array<{ dataKey: string; color: string; name: string }>}
+              lines={LIGHT_SOUND_AIR_LINES as unknown as Array<{ dataKey: string; color: string; name: string; yAxisId?: 'left' | 'right' }>}
               isLoading={!history.length && (isRefreshing || isHistoryLoading)}
             />
           </section>

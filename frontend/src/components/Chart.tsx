@@ -20,6 +20,7 @@ interface ChartProps {
     dataKey: string;
     color: string;
     name: string;
+    yAxisId?: 'left' | 'right';
   }>;
   isLoading?: boolean;
 }
@@ -104,7 +105,7 @@ export const Chart = memo(function Chart({ data, title, lines, isLoading }: Char
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+          <LineChart data={chartData} margin={{ top: 5, right: 28, left: 8, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
             <XAxis
               dataKey="time"
@@ -114,11 +115,22 @@ export const Chart = memo(function Chart({ data, title, lines, isLoading }: Char
               axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
             />
             <YAxis
+              yAxisId="left"
               stroke="#64748b"
               fontSize={12}
               tickLine={false}
               axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
             />
+            {lines.some((line) => line.yAxisId === 'right') && (
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                stroke="#64748b"
+                fontSize={12}
+                tickLine={false}
+                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+              />
+            )}
             <Tooltip content={<CustomTooltip />} />
             <Legend
               wrapperStyle={{ paddingTop: '20px' }}
@@ -129,6 +141,7 @@ export const Chart = memo(function Chart({ data, title, lines, isLoading }: Char
                 key={line.dataKey}
                 type="monotone"
                 dataKey={line.dataKey}
+                yAxisId={line.yAxisId ?? 'left'}
                 stroke={line.color}
                 name={line.name}
                 strokeWidth={2}

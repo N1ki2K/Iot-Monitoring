@@ -11,6 +11,7 @@ import type {
 } from '../types';
 import { ProfileMenu } from './ProfileMenu';
 import { UserInviteModal } from './UserInviteModal';
+import { useI18n } from '../useI18n';
 
 interface AdminDashboardProps {
   user?: AuthUser | null;
@@ -35,6 +36,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
+  const { t, locale } = useI18n();
   const navigate = useNavigate();
   const isAdmin = isAdminUser(user);
   const [users, setUsers] = useState<UserListItem[]>([]);
@@ -71,14 +73,14 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
           setSelectedUserId((current) => current || data[0].id);
         }
       } catch (error) {
-        const message = getErrorMessage(error, 'Failed to load users.');
+        const message = getErrorMessage(error, t('admin.loadUsersFailed'));
         setUsersError(message);
       } finally {
         setIsLoading(false);
       }
     };
     loadUsers();
-  }, [isAdmin]);
+  }, [isAdmin, t]);
 
   useEffect(() => {
     const loadControllers = async () => {
@@ -89,14 +91,14 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         const available = await api.getAvailableDevices();
         setAvailableDevices(available);
       } catch (error) {
-        const message = getErrorMessage(error, 'Failed to load controllers.');
+        const message = getErrorMessage(error, t('admin.loadControllersFailed'));
         setControllerError(message);
         setControllers([]);
         setAvailableDevices([]);
       }
     };
     loadControllers();
-  }, [isAdmin]);
+  }, [isAdmin, t]);
 
   useEffect(() => {
     const loadAssignments = async () => {
@@ -108,12 +110,12 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         const data = await api.getUserControllers(selectedUserId);
         setAssignments(data);
       } catch (error) {
-        const message = getErrorMessage(error, 'Failed to load controllers.');
+        const message = getErrorMessage(error, t('admin.loadAssignmentsFailed'));
         setAssignError(message);
       }
     };
     loadAssignments();
-  }, [selectedUserId]);
+  }, [selectedUserId, t]);
 
   const resetInviteState = () => {
     setInviteForm({ username: '', email: '', role: 'user' });
@@ -125,7 +127,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const handleInviteSubmit = async () => {
     setInviteError('');
     if (!inviteForm.username.trim() || !inviteForm.email.trim()) {
-      setInviteError('Username and email are required.');
+      setInviteError(t('settings.referralRequired'));
       return;
     }
     setIsInviting(true);
@@ -139,7 +141,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       const data = await api.getUsers();
       setUsers(data);
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to invite user.');
+      const message = getErrorMessage(error, t('admin.inviteFailed'));
       setInviteError(message);
     } finally {
       setIsInviting(false);
@@ -147,14 +149,14 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   };
 
   const handleDeleteUser = async (userId: number) => {
-    if (!confirm('Delete this user? This cannot be undone.')) return;
+    if (!confirm(t('admin.deleteUserConfirm'))) return;
     setUsersError('');
     setIsDeletingUserId(userId);
     try {
       await api.deleteUser(userId);
       setUsers((prev) => prev.filter((row) => row.id !== userId));
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to delete user.');
+      const message = getErrorMessage(error, t('admin.deleteUserFailed'));
       setUsersError(message);
     } finally {
       setIsDeletingUserId(null);
@@ -165,7 +167,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
     event.preventDefault();
     setAssignError('');
     if (!selectedUserId || !controllerId) {
-      setAssignError('Select a user and controller.');
+      setAssignError(t('admin.selectUserAndController'));
       return;
     }
     try {
@@ -174,7 +176,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       setAssignments(data);
       setControllerId('');
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to assign controller.');
+      const message = getErrorMessage(error, t('admin.assignFailed'));
       setAssignError(message);
     }
   };
@@ -187,7 +189,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       const data = await api.getUserControllers(selectedUserId);
       setAssignments(data);
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to remove controller.');
+      const message = getErrorMessage(error, t('settings.removeDeviceFailed'));
       setAssignError(message);
     }
   };
@@ -196,7 +198,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
     event.preventDefault();
     setControllerError('');
     if (!newDeviceId.trim()) {
-      setControllerError('Device ID is required.');
+      setControllerError(t('admin.deviceIdRequired'));
       return;
     }
     try {
@@ -209,7 +211,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       setNewDeviceId('');
       setNewLabel('');
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to create controller.');
+      const message = getErrorMessage(error, t('admin.createControllerFailed'));
       setControllerError(message);
     }
   };
@@ -224,7 +226,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         setControllerId('');
       }
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to delete controller.');
+      const message = getErrorMessage(error, t('admin.deleteControllerFailed'));
       setControllerError(message);
     }
   };
@@ -247,11 +249,11 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                 <img src="/IotMonitoring.png" alt="IoT Monitoring" className="w-12 h-12 object-contain" />
               </div>
               <h1 className="text-2xl lg:text-3xl font-bold text-white">
-                IoT Monitoring
+                {t('common.appName')}
               </h1>
             </NavLink>
             <p className="text-gray-400 text-sm">
-              Admin dashboard
+              {t('admin.subtitle')}
             </p>
           </div>
 
@@ -266,7 +268,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                 }
                 end
               >
-                Dashboard
+                {t('common.dashboard')}
               </NavLink>
               <NavLink
                 to="/admin"
@@ -276,7 +278,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   }`
                 }
               >
-                Admin Dashboard
+                {t('common.adminDashboard')}
               </NavLink>
               <NavLink
                 to="/audit"
@@ -286,7 +288,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   }`
                 }
               >
-                Audit Logs
+                {t('common.auditLogs')}
               </NavLink>
               <NavLink
                 to="/health"
@@ -296,7 +298,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   }`
                 }
               >
-                System Health
+                {t('common.systemHealth')}
               </NavLink>
             </nav>
             {user && (
@@ -312,8 +314,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
           <div className="p-4 border-b border-slate-700/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h3 className="text-lg font-semibold text-gray-200">Users</h3>
-              <p className="text-sm text-gray-400 mt-1">Admin view of registered users.</p>
+              <h3 className="text-lg font-semibold text-gray-200">{t('admin.users')}</h3>
+              <p className="text-sm text-gray-400 mt-1">{t('admin.usersHelp')}</p>
             </div>
             <button
               type="button"
@@ -323,7 +325,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                 setShowInviteModal(true);
               }}
             >
-              Invite user
+              {t('admin.inviteUser')}
             </button>
           </div>
           {usersError ? (
@@ -333,12 +335,12 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Invited</th>
-                    <th>Must Change</th>
-                    <th>Created</th>
+                    <th>{t('common.username')}</th>
+                    <th>{t('common.email')}</th>
+                    <th>{t('common.role')}</th>
+                    <th>{t('admin.invited')}</th>
+                    <th>{t('admin.mustChange')}</th>
+                    <th>{t('common.created')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -346,30 +348,30 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   {isLoading ? (
                     <tr>
                       <td colSpan={7} className="text-center py-8 text-gray-500">
-                        Loading...
+                        {t('common.loading')}
                       </td>
                     </tr>
                   ) : users.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="text-center py-8 text-gray-500">
-                        No users found
+                        {t('admin.noUsers')}
                       </td>
                     </tr>
                   ) : (
                     users.map((row) => {
                       const isAdminFlag = normalizeFlag(row.is_admin) || row.role === 'admin';
-                      const roleLabel = isAdminFlag ? 'Admin' : 'User';
+                      const roleLabel = isAdminFlag ? t('common.admin') : t('common.user');
                       return (
                         <tr key={row.id}>
                           <td>{row.username}</td>
                           <td>{row.email}</td>
                           <td>{roleLabel}</td>
-                          <td>{row.invited_at ? new Date(row.invited_at).toLocaleString() : '-'}</td>
-                          <td>{normalizeFlag(row.must_change_password) ? 'Yes' : 'No'}</td>
-                          <td>{new Date(row.created_at).toLocaleString()}</td>
+                          <td>{row.invited_at ? new Date(row.invited_at).toLocaleString(locale) : '-'}</td>
+                          <td>{normalizeFlag(row.must_change_password) ? t('common.yes') : t('common.no')}</td>
+                          <td>{new Date(row.created_at).toLocaleString(locale)}</td>
                           <td className="text-right">
                             {row.id === user?.id ? (
-                              <span className="text-xs text-gray-500">You</span>
+                              <span className="text-xs text-gray-500">{t('admin.you')}</span>
                             ) : (
                               <button
                                 type="button"
@@ -377,7 +379,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                                 onClick={() => handleDeleteUser(row.id)}
                                 disabled={isDeletingUserId === row.id}
                               >
-                                {isDeletingUserId === row.id ? 'Deleting...' : 'Delete'}
+                                {isDeletingUserId === row.id ? t('admin.deleting') : t('common.delete')}
                               </button>
                             )}
                           </td>
@@ -393,13 +395,13 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
 
         <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
           <div className="p-4 border-b border-slate-700/40">
-            <h3 className="text-lg font-semibold text-gray-200">Controller Assignments</h3>
-            <p className="text-sm text-gray-400 mt-1">Assign controllers (device ids) to users.</p>
+            <h3 className="text-lg font-semibold text-gray-200">{t('admin.controllerAssignments')}</h3>
+            <p className="text-sm text-gray-400 mt-1">{t('admin.controllerAssignmentsHelp')}</p>
           </div>
           <div className="p-4 space-y-4">
             <form className="grid gap-4 md:grid-cols-3" onSubmit={handleAssign}>
               <div>
-                <label className="text-sm text-gray-300">User</label>
+                <label className="text-sm text-gray-300">{t('common.user')}</label>
                 <select
                   className="select w-full mt-2"
                   value={selectedUserId}
@@ -407,7 +409,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                     setSelectedUserId(event.target.value ? Number(event.target.value) : '')
                   }
                 >
-                  <option value="">Select user</option>
+                  <option value="">{t('admin.selectUser')}</option>
                   {users.map((row) => (
                     <option key={row.id} value={row.id}>
                       {row.username} ({row.email})
@@ -416,7 +418,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                 </select>
               </div>
               <div>
-                <label className="text-sm text-gray-300">Controller</label>
+                <label className="text-sm text-gray-300">{t('admin.controllers')}</label>
                 <select
                   className="select w-full mt-2"
                   value={controllerId}
@@ -424,7 +426,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                     setControllerId(event.target.value ? Number(event.target.value) : '')
                   }
                 >
-                  <option value="">Select controller</option>
+                  <option value="">{t('admin.selectController')}</option>
                   {controllers.map((controller) => (
                     <option key={controller.id} value={controller.id}>
                       {controller.label ? `${controller.label} • ` : ''}
@@ -436,7 +438,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               </div>
               <div className="flex items-end">
                 <button className="btn btn-primary w-full" type="submit">
-                  Assign
+                  {t('admin.assign')}
                 </button>
               </div>
             </form>
@@ -451,9 +453,9 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Controller ID</th>
-                    <th>Assigned</th>
-                    <th>Code</th>
+                    <th>{t('admin.controllerId')}</th>
+                    <th>{t('settings.assigned')}</th>
+                    <th>{t('admin.code')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -461,13 +463,13 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   {selectedUserId === '' ? (
                     <tr>
                       <td colSpan={4} className="text-center py-8 text-gray-500">
-                        Select a user to view assignments
+                        {t('admin.selectUserForAssignments')}
                       </td>
                     </tr>
                   ) : assignments.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="text-center py-8 text-gray-500">
-                        No controllers assigned
+                        {t('admin.noAssignments')}
                       </td>
                     </tr>
                   ) : (
@@ -481,7 +483,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                               : ''}
                           {assignment.device_id}
                         </td>
-                        <td>{new Date(assignment.created_at).toLocaleString()}</td>
+                        <td>{new Date(assignment.created_at).toLocaleString(locale)}</td>
                         <td>{assignment.pairing_code || '-'}</td>
                         <td className="text-right">
                           <button
@@ -489,7 +491,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                             className="btn btn-ghost text-red-300"
                             onClick={() => handleRemove(assignment.controller_id)}
                           >
-                            Remove
+                            {t('common.remove')}
                           </button>
                         </td>
                       </tr>
@@ -503,13 +505,13 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
 
         <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
           <div className="p-4 border-b border-slate-700/40">
-            <h3 className="text-lg font-semibold text-gray-200">Controllers</h3>
-            <p className="text-sm text-gray-400 mt-1">Create and manage controllers.</p>
+            <h3 className="text-lg font-semibold text-gray-200">{t('admin.controllers')}</h3>
+            <p className="text-sm text-gray-400 mt-1">{t('admin.controllersHelp')}</p>
           </div>
           <div className="p-4 space-y-4">
             <form className="grid gap-4 md:grid-cols-3" onSubmit={handleCreateController}>
               <div>
-                <label className="text-sm text-gray-300">Device ID</label>
+                <label className="text-sm text-gray-300">{t('admin.deviceId')}</label>
                 <input
                   className="input mt-2"
                   list="available-devices"
@@ -524,7 +526,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                 </datalist>
               </div>
               <div>
-                <label className="text-sm text-gray-300">Label (optional)</label>
+                <label className="text-sm text-gray-300">{t('admin.labelOptional')}</label>
                 <input
                   className="input mt-2"
                   placeholder="Lab Sensor 01"
@@ -534,7 +536,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               </div>
               <div className="flex items-end">
                 <button className="btn btn-secondary w-full" type="submit">
-                  Add Controller
+                  {t('admin.addController')}
                 </button>
               </div>
             </form>
@@ -549,10 +551,10 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Device ID</th>
-                    <th>Label</th>
-                    <th>Code</th>
-                    <th>Created</th>
+                    <th>{t('admin.deviceId')}</th>
+                    <th>{t('common.label')}</th>
+                    <th>{t('admin.code')}</th>
+                    <th>{t('common.created')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -560,7 +562,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   {controllers.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="text-center py-8 text-gray-500">
-                        No controllers created
+                        {t('admin.noControllersCreated')}
                       </td>
                     </tr>
                   ) : (
@@ -569,14 +571,14 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                         <td>{controller.device_id}</td>
                         <td>{controller.label || '-'}</td>
                         <td>{controller.pairing_code || '-'}</td>
-                        <td>{new Date(controller.created_at).toLocaleString()}</td>
+                        <td>{new Date(controller.created_at).toLocaleString(locale)}</td>
                         <td className="text-right">
                           <button
                             type="button"
                             className="btn btn-ghost text-red-300"
                             onClick={() => handleDeleteController(controller.id)}
                           >
-                            Delete
+                            {t('common.delete')}
                           </button>
                         </td>
                       </tr>
@@ -594,7 +596,9 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
           error={inviteError}
           response={inviteResponse}
           values={inviteForm}
-          onChange={(next) => setInviteForm((prev) => ({ ...prev, ...next }))}
+          onChange={(next) =>
+            setInviteForm((prev: UserInviteRequest) => ({ ...prev, ...next }))
+          }
           onSubmit={handleInviteSubmit}
           onClose={() => {
             setShowInviteModal(false);
@@ -603,7 +607,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         />
 
         <footer className="text-center text-gray-600 text-sm py-4">
-          <p>ESP32 IoT Monitoring System • Admin view</p>
+          <p>{t('admin.footer')}</p>
         </footer>
       </div>
     </div>

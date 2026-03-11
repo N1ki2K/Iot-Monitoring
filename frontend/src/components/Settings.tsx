@@ -4,6 +4,7 @@ import { api } from '../api';
 import type { AuthUser, UserControllerAssignment, UserInviteResponse } from '../types';
 import { ProfileMenu } from './ProfileMenu';
 import { normalizeFlag } from '../utils/flags';
+import { useI18n } from '../useI18n';
 
 interface SettingsProps {
   user: AuthUser;
@@ -20,6 +21,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
+  const { t, locale } = useI18n();
   const navigate = useNavigate();
   const isAdmin = user.role === 'admin' || normalizeFlag(user.is_admin);
   const [username, setUsername] = useState(user.username);
@@ -64,14 +66,14 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
         });
         setLabelEdits(initialLabels);
       } catch (error) {
-        const message = getErrorMessage(error, 'Failed to load devices.');
+        const message = getErrorMessage(error, t('settings.loadDevicesFailed'));
         setAssignmentsError(message);
       } finally {
         setIsLoadingAssignments(false);
       }
     };
     loadAssignments();
-  }, [user.id]);
+  }, [t, user.id]);
 
   const handleProfileSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -80,9 +82,9 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
     try {
       const updated = await api.updateMe({ username, email });
       onUserUpdated(updated);
-      setProfileStatus('Profile updated.');
+      setProfileStatus(t('settings.profileUpdated'));
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to update profile.');
+      const message = getErrorMessage(error, t('settings.profileUpdateFailed'));
       setProfileError(message);
     }
   };
@@ -92,21 +94,21 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
     setPasswordError('');
     setPasswordStatus('');
     if (!currentPassword || !newPassword) {
-      setPasswordError('Enter your current and new password.');
+      setPasswordError(t('settings.enterCurrentAndNewPassword'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError('Passwords do not match.');
+      setPasswordError(t('auth.passwordsNoMatch'));
       return;
     }
     try {
       await api.updatePassword({ currentPassword, newPassword });
-      setPasswordStatus('Password updated.');
+      setPasswordStatus(t('settings.passwordUpdated'));
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to update password.');
+      const message = getErrorMessage(error, t('settings.passwordUpdateFailed'));
       setPasswordError(message);
     }
   };
@@ -118,7 +120,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
       const data = await api.getUserControllers(user.id);
       setAssignments(data);
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to update label.');
+      const message = getErrorMessage(error, t('settings.updateLabelFailed'));
       setAssignmentsError(message);
     }
   };
@@ -130,7 +132,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
       const data = await api.getUserControllers(user.id);
       setAssignments(data);
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to remove device.');
+      const message = getErrorMessage(error, t('settings.removeDeviceFailed'));
       setAssignmentsError(message);
     }
   };
@@ -141,7 +143,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
       await api.deleteMe();
       onLogout();
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to delete account.');
+      const message = getErrorMessage(error, t('settings.deleteAccountFailed'));
       setDeleteError(message);
     }
   };
@@ -151,7 +153,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
     setReferError('');
     setReferResponse(null);
     if (!referUsername.trim() || !referEmail.trim()) {
-      setReferError('Username and email are required.');
+      setReferError(t('settings.referralRequired'));
       return;
     }
 
@@ -165,7 +167,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
       setReferUsername('');
       setReferEmail('');
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to send referral invite.');
+      const message = getErrorMessage(error, t('settings.referralFailed'));
       setReferError(message);
     } finally {
       setIsReferring(false);
@@ -181,9 +183,9 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900/80 border border-slate-700/60 shadow-lg shadow-cyan-500/10">
                 <img src="/IotMonitoring.png" alt="IoT Monitoring" className="w-12 h-12 object-contain" />
               </div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-white">Settings</h1>
+              <h1 className="text-2xl lg:text-3xl font-bold text-white">{t('common.settings')}</h1>
             </div>
-            <p className="text-gray-400 text-sm">Manage your profile, devices, and security.</p>
+            <p className="text-gray-400 text-sm">{t('settings.subtitle')}</p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -197,7 +199,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                 }
                 end
               >
-                Dashboard
+                {t('common.dashboard')}
               </NavLink>
               {isAdmin && (
                 <NavLink
@@ -208,7 +210,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                     }`
                   }
                 >
-                  Admin Dashboard
+                  {t('common.adminDashboard')}
                 </NavLink>
               )}
               {isAdmin && (
@@ -220,7 +222,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                     }`
                   }
                 >
-                  Audit Logs
+                  {t('common.auditLogs')}
                 </NavLink>
               )}
               {isAdmin && (
@@ -232,7 +234,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                     }`
                   }
                 >
-                  System Health
+                  {t('common.systemHealth')}
                 </NavLink>
               )}
             </nav>
@@ -246,13 +248,13 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
 
         <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
           <div className="p-4 border-b border-slate-700/40">
-            <h3 className="text-lg font-semibold text-gray-200">Profile</h3>
-            <p className="text-sm text-gray-400 mt-1">Update your account details.</p>
+            <h3 className="text-lg font-semibold text-gray-200">{t('settings.profile')}</h3>
+            <p className="text-sm text-gray-400 mt-1">{t('settings.profileHelp')}</p>
           </div>
           <form className="p-4 space-y-4" onSubmit={handleProfileSave}>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="text-sm text-gray-300">Username</label>
+                <label className="text-sm text-gray-300">{t('common.username')}</label>
                 <input
                   className="input mt-2"
                   value={username}
@@ -260,7 +262,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-300">Email</label>
+                <label className="text-sm text-gray-300">{t('common.email')}</label>
                 <input
                   className="input mt-2"
                   value={email}
@@ -270,7 +272,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
             </div>
             <div className="flex items-center gap-3">
               <button className="btn btn-primary" type="submit">
-                Save changes
+                {t('settings.saveChanges')}
               </button>
               {profileStatus && <span className="text-sm text-emerald-300">{profileStatus}</span>}
               {profileError && <span className="text-sm text-red-300">{profileError}</span>}
@@ -280,13 +282,13 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
 
         <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
           <div className="p-4 border-b border-slate-700/40">
-            <h3 className="text-lg font-semibold text-gray-200">Refer a Friend</h3>
-            <p className="text-sm text-gray-400 mt-1">Invite a friend to create a user account.</p>
+            <h3 className="text-lg font-semibold text-gray-200">{t('settings.referFriend')}</h3>
+            <p className="text-sm text-gray-400 mt-1">{t('settings.referHelp')}</p>
           </div>
           <form className="p-4 space-y-4" onSubmit={handleReferFriend}>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="text-sm text-gray-300">Friend Username</label>
+                <label className="text-sm text-gray-300">{t('settings.friendUsername')}</label>
                 <input
                   className="input mt-2"
                   placeholder="friend-user"
@@ -295,7 +297,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-300">Friend Email</label>
+                <label className="text-sm text-gray-300">{t('settings.friendEmail')}</label>
                 <input
                   className="input mt-2"
                   placeholder="friend@example.com"
@@ -306,14 +308,16 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
             </div>
             <div className="flex items-center gap-3">
               <button className="btn btn-primary" type="submit" disabled={isReferring}>
-                {isReferring ? 'Sending...' : 'Send Referral Invite'}
+                {isReferring ? t('settings.sending') : t('settings.sendReferral')}
               </button>
               {referError && <span className="text-sm text-red-300">{referError}</span>}
             </div>
             {referResponse && (
               <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
-                Invite created for {referResponse.user.email}. Temporary password:{' '}
-                <span className="font-mono text-white">{referResponse.tempPassword}</span>
+                {t('settings.referralCreated', {
+                  email: referResponse.user.email,
+                  password: referResponse.tempPassword,
+                })}
               </div>
             )}
           </form>
@@ -321,8 +325,8 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
 
         <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
           <div className="p-4 border-b border-slate-700/40">
-            <h3 className="text-lg font-semibold text-gray-200">Devices</h3>
-            <p className="text-sm text-gray-400 mt-1">Manage your assigned controllers.</p>
+            <h3 className="text-lg font-semibold text-gray-200">{t('settings.devices')}</h3>
+            <p className="text-sm text-gray-400 mt-1">{t('settings.devicesHelp')}</p>
           </div>
           <div className="p-4">
             {assignmentsError && (
@@ -332,9 +336,9 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Device</th>
-                    <th>Label</th>
-                    <th>Assigned</th>
+                    <th>{t('common.device')}</th>
+                    <th>{t('common.label')}</th>
+                    <th>{t('settings.assigned')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -342,13 +346,13 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                   {isLoadingAssignments ? (
                     <tr>
                       <td colSpan={4} className="text-center py-8 text-gray-500">
-                        Loading...
+                        {t('common.loading')}
                       </td>
                     </tr>
                   ) : assignments.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="text-center py-8 text-gray-500">
-                        No devices assigned
+                        {t('settings.noDevicesAssigned')}
                       </td>
                     </tr>
                   ) : (
@@ -367,21 +371,21 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                             }
                           />
                         </td>
-                        <td>{new Date(assignment.created_at).toLocaleString()}</td>
+                        <td>{new Date(assignment.created_at).toLocaleString(locale)}</td>
                         <td className="text-right space-x-2">
                           <button
                             type="button"
                             className="btn btn-secondary"
                             onClick={() => handleLabelSave(assignment.controller_id)}
                           >
-                            Save
+                            {t('common.save')}
                           </button>
                           <button
                             type="button"
                             className="btn btn-ghost text-red-300"
                             onClick={() => handleRemove(assignment.controller_id)}
                           >
-                            Remove
+                            {t('common.remove')}
                           </button>
                         </td>
                       </tr>
@@ -395,14 +399,14 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
 
         <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
           <div className="p-4 border-b border-slate-700/40">
-            <h3 className="text-lg font-semibold text-gray-200">Security</h3>
-            <p className="text-sm text-gray-400 mt-1">Change your password or delete your account.</p>
+            <h3 className="text-lg font-semibold text-gray-200">{t('settings.security')}</h3>
+            <p className="text-sm text-gray-400 mt-1">{t('settings.securityHelp')}</p>
           </div>
           <div className="p-4 space-y-8">
             <form className="space-y-4" onSubmit={handlePasswordSave}>
               <div className="grid gap-4 md:grid-cols-3">
                 <div>
-                  <label className="text-sm text-gray-300">Current password</label>
+                  <label className="text-sm text-gray-300">{t('settings.currentPassword')}</label>
                   <input
                     type="password"
                     className="input mt-2"
@@ -411,7 +415,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-300">New password</label>
+                  <label className="text-sm text-gray-300">{t('settings.newPassword')}</label>
                   <input
                     type="password"
                     className="input mt-2"
@@ -420,7 +424,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-300">Confirm new password</label>
+                  <label className="text-sm text-gray-300">{t('auth.confirmPassword')}</label>
                   <input
                     type="password"
                     className="input mt-2"
@@ -431,7 +435,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
               </div>
               <div className="flex items-center gap-3">
                 <button className="btn btn-primary" type="submit">
-                  Update password
+                  {t('settings.updatePassword')}
                 </button>
                 {passwordStatus && <span className="text-sm text-emerald-300">{passwordStatus}</span>}
                 {passwordError && <span className="text-sm text-red-300">{passwordError}</span>}
@@ -439,9 +443,9 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
             </form>
 
             <div className="border-t border-slate-700/40 pt-6">
-              <h4 className="text-sm font-semibold text-gray-200">Delete account</h4>
+              <h4 className="text-sm font-semibold text-gray-200">{t('settings.deleteAccount')}</h4>
               <p className="text-sm text-gray-400 mt-1">
-                This removes your account and assigned devices.
+                {t('settings.deleteAccountHelp')}
               </p>
               <div className="mt-4 flex flex-col md:flex-row gap-3">
                 <button
@@ -449,7 +453,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                   className="btn btn-ghost text-red-300"
                   onClick={() => setShowDeleteConfirm(true)}
                 >
-                  Delete account
+                  {t('settings.deleteAccount')}
                 </button>
               </div>
               {deleteError && <div className="text-sm text-red-300 mt-3">{deleteError}</div>}
@@ -461,9 +465,9 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-slate-800/80 bg-slate-900/90 p-6">
-            <h3 className="text-lg font-semibold text-white">Delete account?</h3>
+            <h3 className="text-lg font-semibold text-white">{t('settings.deleteAccountTitle')}</h3>
             <p className="text-sm text-gray-400 mt-2">
-              This will remove your account and all assigned devices. This action cannot be undone.
+              {t('settings.deleteAccountConfirm')}
             </p>
             {deleteError && <div className="text-sm text-red-300 mt-3">{deleteError}</div>}
             <div className="mt-6 flex items-center justify-end gap-3">
@@ -475,10 +479,10 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                   setDeleteError('');
                 }}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button type="button" className="btn btn-ghost text-red-300" onClick={handleDeleteAccount}>
-                Yes, delete
+                {t('settings.deleteAccountYes')}
               </button>
             </div>
           </div>

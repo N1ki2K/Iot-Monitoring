@@ -73,7 +73,7 @@ export const SensorCard = memo(function SensorCard({ type, value, unit, label, i
       {/* Content */}
       <div className="relative z-10">
         {/* Icon */}
-        <div className={`inline-flex items-center justify-center w-10 h-10 rounded-lg bg-slate-700/50 ${config.color} mb-4`}>
+        <div className={`sensor-card-icon inline-flex items-center justify-center w-10 h-10 rounded-lg bg-slate-700/50 ${config.color} mb-4`}>
           <Icon className="w-5 h-5" />
         </div>
 

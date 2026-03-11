@@ -11,22 +11,12 @@ import DeviceSelector from './DeviceSelector';
 import { isUserPrivileged } from '../utils/flags';
 import { getDisplayedSound } from '../utils/readings';
 import { getDisplayedAir } from '../utils/air';
+import { useI18n } from '../useI18n';
 
 interface DashboardProps {
   user?: AuthUser | null;
   onLogout: () => void;
 }
-
-const TEMPERATURE_HUMIDITY_LINES = [
-  { dataKey: 'temp', color: '#f97316', name: 'Temperature (°C)', yAxisId: 'left' },
-  { dataKey: 'humidity', color: '#06b6d4', name: 'Humidity (%)', yAxisId: 'right' },
-] as const;
-
-const LIGHT_SOUND_AIR_LINES = [
-  { dataKey: 'lux', color: '#fbbf24', name: 'Light (lux)', yAxisId: 'left' },
-  { dataKey: 'sound', color: '#a855f7', name: 'Sound (est. dB SPL)', yAxisId: 'right' },
-  { dataKey: 'air', color: '#22c55e', name: 'Air Quality (% baseline)', yAxisId: 'right' },
-] as const;
 
 const HISTORY_REFRESH_INTERVAL_MS = 30000;
 const LIVE_REFRESH_INTERVAL_MS = 5000;
@@ -40,8 +30,18 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 export function Dashboard({ user, onLogout }: DashboardProps) {
+  const { t, locale } = useI18n();
   const navigate = useNavigate();
   const isAdmin = isUserPrivileged(user);
+  const temperatureHumidityLines = [
+    { dataKey: 'temp', color: '#f97316', name: t('dataTable.temp'), yAxisId: 'left' as const },
+    { dataKey: 'humidity', color: '#06b6d4', name: t('dataTable.humidity'), yAxisId: 'right' as const },
+  ];
+  const lightSoundAirLines = [
+    { dataKey: 'lux', color: '#fbbf24', name: t('dataTable.light'), yAxisId: 'left' as const },
+    { dataKey: 'sound', color: '#a855f7', name: t('dataTable.sound'), yAxisId: 'right' as const },
+    { dataKey: 'air', color: '#22c55e', name: t('dataTable.air'), yAxisId: 'right' as const },
+  ];
   const [selectedDevice, setSelectedDevice] = useState<string>('');
   const [latestReading, setLatestReading] = useState<Reading | null>(null);
   const [history, setHistory] = useState<Reading[]>([]);
@@ -86,7 +86,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedDevice, user]);
+  }, [isAdmin, selectedDevice, user]);
 
   useEffect(() => {
     loadDevices();
@@ -172,11 +172,11 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
 
     if (claimMethod === 'code') {
       if (!/^\d{5}$/.test(normalizedCode)) {
-        setClaimError('Enter your 5-digit code.');
+        setClaimError(t('dashboard.enterCode'));
         return;
       }
     } else if (!normalizedQrData) {
-      setClaimError('Paste QR code content.');
+      setClaimError(t('dashboard.pasteQr'));
       return;
     }
 
@@ -196,7 +196,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       setShowClaimModal(false);
       await loadDevices();
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to claim controller.');
+      const message = getErrorMessage(error, t('dashboard.claimFailed'));
       setClaimError(message);
     } finally {
       setIsClaiming(false);
@@ -214,11 +214,11 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                 <img src="/IotMonitoring.png" alt="IoT Monitoring" className="w-12 h-12 object-contain" />
               </div>
               <h1 className="text-2xl lg:text-3xl font-bold text-white">
-                IoT Monitoring
+                {t('common.appName')}
               </h1>
             </div>
             <p className="text-gray-400 text-sm">
-              Real-time sensor data visualization
+              {t('dashboard.subtitle')}
             </p>
           </div>
 
@@ -234,7 +234,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                   }
                   end
                 >
-                  Dashboard
+                  {t('common.dashboard')}
                 </NavLink>
               <NavLink
                 to="/admin"
@@ -244,7 +244,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                   }`
                 }
               >
-                Admin Dashboard
+                {t('common.adminDashboard')}
               </NavLink>
               <NavLink
                 to="/audit"
@@ -254,7 +254,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                   }`
                 }
               >
-                Audit Logs
+                {t('common.auditLogs')}
               </NavLink>
               <NavLink
                 to="/health"
@@ -264,7 +264,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                   }`
                 }
               >
-                System Health
+                {t('common.systemHealth')}
               </NavLink>
             </nav>
           )}
@@ -274,7 +274,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                 className="btn btn-secondary flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
-                <span>Add Device</span>
+                <span>{t('dashboard.addDevice')}</span>
               </button>
             )}
             <DeviceSelector
@@ -290,7 +290,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
               className="btn btn-secondary flex items-center gap-2"
             >
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Refresh</span>
+              <span className="hidden sm:inline">{t('common.refresh')}</span>
             </button>
             {user && (
               <ProfileMenu
@@ -307,53 +307,53 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
           <div className="flex items-center gap-2 text-sm">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-green-400">Live</span>
+              <span className="text-green-400">{t('dashboard.live')}</span>
             </span>
             <span className="text-gray-600">•</span>
             <span className="text-gray-500">
-              Last updated: {lastUpdate.toLocaleTimeString()}
+              {t('dashboard.lastUpdated', { time: lastUpdate.toLocaleTimeString(locale) })}
             </span>
             <span className="text-gray-600">•</span>
-            <span className="text-gray-500">Auto-refresh: 5s</span>
+            <span className="text-gray-500">{t('dashboard.autoRefresh')}</span>
           </div>
         )}
 
         {/* Sensor Cards */}
         {selectedDevice && (
           <section>
-            <h2 className="text-lg font-semibold text-gray-300 mb-4">Current Readings</h2>
+            <h2 className="text-lg font-semibold text-gray-300 mb-4">{t('dashboard.currentReadings')}</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <SensorCard
                 type="temperature"
-                label="Temperature"
+                label={t('dashboard.temperature')}
                 value={latestReading ? parseFloat(latestReading.temperature_c) : 0}
                 unit="°C"
                 isLoading={!latestReading && isRefreshing}
               />
               <SensorCard
                 type="humidity"
-                label="Humidity"
+                label={t('dashboard.humidity')}
                 value={latestReading ? parseFloat(latestReading.humidity_pct) : 0}
                 unit="%"
                 isLoading={!latestReading && isRefreshing}
               />
               <SensorCard
                 type="light"
-                label="Light Level"
+                label={t('dashboard.lightLevel')}
                 value={latestReading ? parseFloat(latestReading.lux) : 0}
                 unit="lux"
                 isLoading={!latestReading && isRefreshing}
               />
               <SensorCard
                 type="sound"
-                label="Sound Level"
+                label={t('dashboard.soundLevel')}
                 value={getDisplayedSound(latestReading)}
                 unit="dB"
                 isLoading={!latestReading && isRefreshing}
               />
               <SensorCard
                 type="air"
-                label="Air vs Baseline"
+                label={t('dashboard.airVsBaseline')}
                 value={getDisplayedAir(latestReading)}
                 unit="%"
                 isLoading={!latestReading && isRefreshing}
@@ -366,15 +366,15 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
         {selectedDevice && (
           <section className="grid lg:grid-cols-2 gap-6">
             <Chart
-              title="Temperature & Humidity"
+              title={t('dashboard.tempHumidityChart')}
               data={history}
-              lines={TEMPERATURE_HUMIDITY_LINES as unknown as Array<{ dataKey: string; color: string; name: string; yAxisId?: 'left' | 'right' }>}
+              lines={temperatureHumidityLines}
               isLoading={!history.length && (isRefreshing || isHistoryLoading)}
             />
             <Chart
-              title="Light, Sound & Air Quality"
+              title={t('dashboard.lightSoundAirChart')}
               data={history}
-              lines={LIGHT_SOUND_AIR_LINES as unknown as Array<{ dataKey: string; color: string; name: string; yAxisId?: 'left' | 'right' }>}
+              lines={lightSoundAirLines}
               isLoading={!history.length && (isRefreshing || isHistoryLoading)}
             />
           </section>
@@ -387,7 +387,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
 
         {/* Footer */}
         <footer className="text-center text-gray-600 text-sm py-4">
-          <p>ESP32 IoT Monitoring System • Real-time sensor data</p>
+          <p>{t('dashboard.footer')}</p>
         </footer>
       </div>
 
@@ -395,7 +395,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-slate-800/80 bg-slate-900/90 p-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Claim controller</h3>
+              <h3 className="text-lg font-semibold text-white">{t('dashboard.claimController')}</h3>
               <button
                 className="btn btn-ghost"
                 onClick={() => {
@@ -407,7 +407,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                   setClaimLabel('');
                 }}
               >
-                Close
+                {t('common.close')}
               </button>
             </div>
             <form className="mt-6 space-y-4" onSubmit={handleClaim}>
@@ -417,42 +417,42 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                   className={`btn ${claimMethod === 'code' ? 'btn-primary' : 'btn-ghost'}`}
                   onClick={() => setClaimMethod('code')}
                 >
-                  Pairing Code
+                  {t('dashboard.pairingCode')}
                 </button>
                 <button
                   type="button"
                   className={`btn ${claimMethod === 'qr' ? 'btn-primary' : 'btn-ghost'}`}
                   onClick={() => setClaimMethod('qr')}
                 >
-                  QR Code
+                  {t('dashboard.qrCode')}
                 </button>
               </div>
               {claimMethod === 'code' ? (
                 <div>
-                  <label className="text-sm text-gray-300">Pairing code</label>
+                  <label className="text-sm text-gray-300">{t('dashboard.pairingCodeLabel')}</label>
                   <input
                     className="input mt-2"
-                    placeholder="5-digit code"
+                    placeholder={t('dashboard.pairingCodePlaceholder')}
                     value={claimCode}
                     onChange={(event) => setClaimCode(event.target.value)}
                   />
                 </div>
               ) : (
                 <div>
-                  <label className="text-sm text-gray-300">QR code content</label>
+                  <label className="text-sm text-gray-300">{t('dashboard.qrContent')}</label>
                   <textarea
                     className="input mt-2 min-h-24"
-                    placeholder="Paste scanned QR content (URL or JSON)"
+                    placeholder={t('dashboard.qrContentPlaceholder')}
                     value={claimQrData}
                     onChange={(event) => setClaimQrData(event.target.value)}
                   />
                 </div>
               )}
               <div>
-                <label className="text-sm text-gray-300">Device label (optional)</label>
+                <label className="text-sm text-gray-300">{t('dashboard.deviceLabelOptional')}</label>
                 <input
                   className="input mt-2"
-                  placeholder="My office sensor"
+                  placeholder={t('dashboard.deviceLabelPlaceholder')}
                   value={claimLabel}
                   onChange={(event) => setClaimLabel(event.target.value)}
                 />
@@ -475,10 +475,10 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                     setClaimLabel('');
                   }}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button className="btn btn-primary" type="submit" disabled={isClaiming}>
-                  {isClaiming ? 'Claiming...' : 'Claim device'}
+                  {isClaiming ? t('dashboard.claiming') : t('dashboard.claimDevice')}
                 </button>
               </div>
             </form>

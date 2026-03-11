@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { UserInviteRequest, UserInviteResponse, UserRole } from '../types';
+import { useI18n } from '../useI18n';
 
 interface UserInviteModalProps {
   isOpen: boolean;
@@ -12,11 +13,6 @@ interface UserInviteModalProps {
   onClose: () => void;
 }
 
-const roleOptions: Array<{ value: UserRole; label: string }> = [
-  { value: 'user', label: 'User' },
-  { value: 'admin', label: 'Admin' },
-];
-
 export function UserInviteModal({
   isOpen,
   isSubmitting,
@@ -27,7 +23,12 @@ export function UserInviteModal({
   onSubmit,
   onClose,
 }: UserInviteModalProps) {
+  const { t } = useI18n();
   const [copyStatus, setCopyStatus] = useState('');
+  const roleOptions: Array<{ value: UserRole; label: string }> = [
+    { value: 'user', label: t('common.user') },
+    { value: 'admin', label: t('common.admin') },
+  ];
 
   if (!isOpen) return null;
 
@@ -35,10 +36,10 @@ export function UserInviteModal({
     if (!response?.tempPassword) return;
     try {
       await navigator.clipboard.writeText(response.tempPassword);
-      setCopyStatus('Copied');
+      setCopyStatus(t('invite.copied'));
       setTimeout(() => setCopyStatus(''), 2000);
     } catch {
-      setCopyStatus('Copy failed');
+      setCopyStatus(t('invite.copyFailed'));
     }
   };
 
@@ -46,32 +47,32 @@ export function UserInviteModal({
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-2xl border border-slate-800/80 bg-slate-900/90 p-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">Invite user</h3>
+          <h3 className="text-lg font-semibold text-white">{t('invite.title')}</h3>
           <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Close
+            {t('common.close')}
           </button>
         </div>
 
         {response ? (
           <div className="mt-6 space-y-4">
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-              <p className="text-sm text-emerald-200">Invite created for {response.user.email}.</p>
+              <p className="text-sm text-emerald-200">{t('invite.created', { email: response.user.email })}</p>
               <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className="flex-1 rounded-lg border border-emerald-500/30 bg-slate-950/40 px-3 py-2">
-                  <p className="text-xs text-emerald-300">Temporary password</p>
+                  <p className="text-xs text-emerald-300">{t('invite.tempPassword')}</p>
                   <p className="text-sm font-mono text-white mt-1">{response.tempPassword}</p>
                 </div>
                 <button type="button" className="btn btn-secondary" onClick={handleCopy}>
-                  {copyStatus || 'Copy'}
+                  {copyStatus || t('invite.copy')}
                 </button>
               </div>
               <p className="text-xs text-emerald-200/80 mt-3">
-                Share this password securely. The user must change it on first login.
+                {t('invite.shareSecurely')}
               </p>
             </div>
             <div className="flex justify-end">
               <button type="button" className="btn btn-primary" onClick={onClose}>
-                Done
+                {t('common.done')}
               </button>
             </div>
           </div>
@@ -84,7 +85,7 @@ export function UserInviteModal({
             }}
           >
             <div>
-              <label className="text-sm text-gray-300">Username</label>
+              <label className="text-sm text-gray-300">{t('common.username')}</label>
               <input
                 className="input mt-2"
                 placeholder="new-user"
@@ -93,7 +94,7 @@ export function UserInviteModal({
               />
             </div>
             <div>
-              <label className="text-sm text-gray-300">Email</label>
+              <label className="text-sm text-gray-300">{t('common.email')}</label>
               <input
                 className="input mt-2"
                 placeholder="name@domain.com"
@@ -102,7 +103,7 @@ export function UserInviteModal({
               />
             </div>
             <div>
-              <label className="text-sm text-gray-300">Role</label>
+              <label className="text-sm text-gray-300">{t('common.role')}</label>
               <select
                 className="select mt-2 w-full"
                 value={values.role || 'user'}
@@ -124,10 +125,10 @@ export function UserInviteModal({
 
             <div className="flex items-center justify-end gap-3">
               <button type="button" className="btn btn-ghost" onClick={onClose}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Inviting...' : 'Send invite'}
+                {isSubmitting ? t('invite.inviting') : t('invite.send')}
               </button>
             </div>
           </form>

@@ -22,10 +22,11 @@ function App() {
       return null;
     }
   });
+  const userId = user?.id;
 
   useEffect(() => {
     const refreshUser = async () => {
-      if (!user) return;
+      if (!userId) return;
       try {
         const current = await api.getMe();
         if (current) {
@@ -37,7 +38,7 @@ function App() {
       }
     };
     refreshUser();
-  }, [user?.id]);
+  }, [userId]);
 
   const handleAuth = (nextUser: AuthUser) => {
     localStorage.setItem('authUser', JSON.stringify(nextUser));

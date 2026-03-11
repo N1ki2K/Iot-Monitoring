@@ -4,6 +4,7 @@ import { api } from '../api';
 import type { Reading, PaginatedResponse } from '../types';
 import { getDisplayedSound } from '../utils/readings';
 import { getDisplayedAir } from '../utils/air';
+import { useI18n } from '../useI18n';
 
 interface DataTableProps {
   selectedDevice?: string;
@@ -12,17 +13,18 @@ interface DataTableProps {
 type SortField = 'ts' | 'device_id' | 'temperature_c' | 'humidity_pct' | 'lux' | 'sound_est_spl' | 'air_baseline_pct';
 type SortOrder = 'ASC' | 'DESC';
 
-const columns: Array<{ key: SortField; label: string; format?: (val: unknown, reading: Reading) => string }> = [
-  { key: 'ts', label: 'Timestamp', format: (val) => new Date(String(val)).toLocaleString() },
-  { key: 'device_id', label: 'Device' },
-  { key: 'temperature_c', label: 'Temp (°C)', format: (val) => Number.parseFloat(String(val)).toFixed(1) },
-  { key: 'humidity_pct', label: 'Humidity (%)', format: (val) => Number.parseFloat(String(val)).toFixed(1) },
-  { key: 'lux', label: 'Light (lux)', format: (val) => Number.parseFloat(String(val)).toFixed(0) },
-  { key: 'sound_est_spl', label: 'Sound (est. dB SPL)', format: (_val, reading) => getDisplayedSound(reading).toFixed(1) },
-  { key: 'air_baseline_pct', label: 'Air (% baseline)', format: (_val, reading) => getDisplayedAir(reading).toFixed(1) },
+const columns: Array<{ key: SortField; labelKey: string; format?: (val: unknown, reading: Reading, locale: string) => string }> = [
+  { key: 'ts', labelKey: 'dataTable.timestamp', format: (val, _reading, locale) => new Date(String(val)).toLocaleString(locale) },
+  { key: 'device_id', labelKey: 'common.device' },
+  { key: 'temperature_c', labelKey: 'dataTable.temp', format: (val) => Number.parseFloat(String(val)).toFixed(1) },
+  { key: 'humidity_pct', labelKey: 'dataTable.humidity', format: (val) => Number.parseFloat(String(val)).toFixed(1) },
+  { key: 'lux', labelKey: 'dataTable.light', format: (val) => Number.parseFloat(String(val)).toFixed(0) },
+  { key: 'sound_est_spl', labelKey: 'dataTable.sound', format: (_val, reading) => getDisplayedSound(reading).toFixed(1) },
+  { key: 'air_baseline_pct', labelKey: 'dataTable.air', format: (_val, reading) => getDisplayedAir(reading).toFixed(1) },
 ];
 
 export const DataTable = memo(function DataTable({ selectedDevice }: DataTableProps) {
+  const { t, locale } = useI18n();
   const [data, setData] = useState<PaginatedResponse<Reading> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -85,14 +87,14 @@ export const DataTable = memo(function DataTable({ selectedDevice }: DataTablePr
       {/* Header */}
       <div className="p-4 border-b border-slate-700/40">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-200">Sensor Readings</h3>
+          <h3 className="text-lg font-semibold text-gray-200">{t('dataTable.title')}</h3>
 
           {/* Search */}
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <input
               type="text"
-              placeholder="Search devices..."
+              placeholder={t('dataTable.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="input pl-10"
@@ -109,7 +111,7 @@ export const DataTable = memo(function DataTable({ selectedDevice }: DataTablePr
               {columns.map((col) => (
                 <th key={col.key} onClick={() => handleSort(col.key)}>
                   <div className="flex items-center gap-2">
-                    <span>{col.label}</span>
+                    <span>{t(col.labelKey)}</span>
                     <SortIcon field={col.key} />
                   </div>
                 </th>
@@ -130,7 +132,7 @@ export const DataTable = memo(function DataTable({ selectedDevice }: DataTablePr
             ) : data?.data.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="text-center py-8 text-gray-500">
-                  No readings found
+                  {t('dataTable.noReadings')}
                 </td>
               </tr>
             ) : (
@@ -139,7 +141,7 @@ export const DataTable = memo(function DataTable({ selectedDevice }: DataTablePr
                   {columns.map((col) => (
                     <td key={col.key}>
                       {col.format
-                        ? col.format(reading[col.key as keyof Reading], reading)
+                        ? col.format(reading[col.key as keyof Reading], reading, locale)
                         : reading[col.key as keyof Reading]?.toString() || '-'}
                     </td>
                   ))}
@@ -155,11 +157,14 @@ export const DataTable = memo(function DataTable({ selectedDevice }: DataTablePr
         <p className="text-sm text-gray-500">
           {data ? (
             <>
-              Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, data.pagination.total)} of{' '}
-              <span className="text-gray-300">{data.pagination.total}</span> readings
+              {t('dataTable.showing', {
+                from: ((page - 1) * limit) + 1,
+                to: Math.min(page * limit, data.pagination.total),
+                total: data.pagination.total,
+              })}
             </>
           ) : (
-            'Loading...'
+            t('common.loading')
           )}
         </p>
 

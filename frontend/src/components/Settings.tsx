@@ -4,6 +4,7 @@ import { api } from '../api';
 import type { AuthUser, UserControllerAssignment, UserInviteResponse } from '../types';
 import { ProfileMenu } from './ProfileMenu';
 import { normalizeFlag } from '../utils/flags';
+import { formatLocaleDateTime } from '../utils/format';
 import { useI18n } from '../useI18n';
 
 interface SettingsProps {
@@ -371,7 +372,7 @@ export function Settings({ user, onUserUpdated, onLogout }: SettingsProps) {
                             }
                           />
                         </td>
-                        <td>{new Date(assignment.created_at).toLocaleString(locale)}</td>
+                        <td>{formatLocaleDateTime(assignment.created_at, locale)}</td>
                         <td className="text-right space-x-2">
                           <button
                             type="button"

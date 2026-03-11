@@ -4,6 +4,7 @@ import { api } from '../api';
 import type { Reading, PaginatedResponse } from '../types';
 import { getDisplayedSound } from '../utils/readings';
 import { getDisplayedAir } from '../utils/air';
+import { formatFixedNumber, formatLocaleDateTime } from '../utils/format';
 import { useI18n } from '../useI18n';
 
 interface DataTableProps {
@@ -14,13 +15,13 @@ type SortField = 'ts' | 'device_id' | 'temperature_c' | 'humidity_pct' | 'lux' |
 type SortOrder = 'ASC' | 'DESC';
 
 const columns: Array<{ key: SortField; labelKey: string; format?: (val: unknown, reading: Reading, locale: string) => string }> = [
-  { key: 'ts', labelKey: 'dataTable.timestamp', format: (val, _reading, locale) => new Date(String(val)).toLocaleString(locale) },
+  { key: 'ts', labelKey: 'dataTable.timestamp', format: (val, _reading, locale) => formatLocaleDateTime(String(val), locale) },
   { key: 'device_id', labelKey: 'common.device' },
-  { key: 'temperature_c', labelKey: 'dataTable.temp', format: (val) => Number.parseFloat(String(val)).toFixed(1) },
-  { key: 'humidity_pct', labelKey: 'dataTable.humidity', format: (val) => Number.parseFloat(String(val)).toFixed(1) },
-  { key: 'lux', labelKey: 'dataTable.light', format: (val) => Number.parseFloat(String(val)).toFixed(0) },
-  { key: 'sound_est_spl', labelKey: 'dataTable.sound', format: (_val, reading) => getDisplayedSound(reading).toFixed(1) },
-  { key: 'air_baseline_pct', labelKey: 'dataTable.air', format: (_val, reading) => getDisplayedAir(reading).toFixed(1) },
+  { key: 'temperature_c', labelKey: 'dataTable.temp', format: (val) => formatFixedNumber(val, 1) },
+  { key: 'humidity_pct', labelKey: 'dataTable.humidity', format: (val) => formatFixedNumber(val, 1) },
+  { key: 'lux', labelKey: 'dataTable.light', format: (val) => formatFixedNumber(val, 0) },
+  { key: 'sound_est_spl', labelKey: 'dataTable.sound', format: (_val, reading) => formatFixedNumber(getDisplayedSound(reading), 1) },
+  { key: 'air_baseline_pct', labelKey: 'dataTable.air', format: (_val, reading) => formatFixedNumber(getDisplayedAir(reading), 1) },
 ];
 
 export const DataTable = memo(function DataTable({ selectedDevice }: DataTableProps) {

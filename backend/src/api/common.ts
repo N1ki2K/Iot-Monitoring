@@ -2,6 +2,9 @@ import crypto from "crypto";
 import type express from "express";
 import { Pool } from "pg";
 
+export const USER_PUBLIC_COLUMNS =
+  "id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at";
+
 export const pool = new Pool({
   host: process.env.PGHOST,
   port: Number(process.env.PGPORT),
@@ -37,6 +40,21 @@ export const requestMetricsMiddleware: express.RequestHandler = (req, res, next)
 
 export const normalizeFlag = (value: unknown) =>
   value === true || value === 1 || value === "1";
+
+export const normalizeUserRow = <
+  T extends {
+    id: unknown;
+    is_admin: unknown;
+    must_change_password: unknown;
+  },
+>(
+  row: T
+) => ({
+  ...row,
+  id: Number(row.id),
+  is_admin: normalizeFlag(row.is_admin) ? 1 : 0,
+  must_change_password: normalizeFlag(row.must_change_password),
+});
 
 export const extractPairingCode = (raw: unknown): string | null => {
   if (raw == null) return null;
@@ -86,19 +104,14 @@ export const getRequester = async (req: express.Request) => {
   const requesterId = Number(req.header("x-user-id"));
   if (!requesterId) return null;
   const result = await pool.query(
-    `SELECT id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at
+    `SELECT ${USER_PUBLIC_COLUMNS}
      FROM users
      WHERE id = $1`,
     [requesterId]
   );
   const row = result.rows[0];
   if (!row) return null;
-  return {
-    ...row,
-    id: Number(row.id),
-    is_admin: normalizeFlag(row.is_admin) ? 1 : 0,
-    must_change_password: normalizeFlag(row.must_change_password),
-  };
+  return normalizeUserRow(row);
 };
 
 export const ensureAdmin = (

@@ -6,8 +6,9 @@ import {
   getRequester,
   hashPassword,
   logAudit,
-  normalizeFlag,
+  normalizeUserRow,
   pool,
+  USER_PUBLIC_COLUMNS,
 } from "../common.js";
 
 export const registerUserRoutes = (app: express.Express) => {
@@ -23,15 +24,11 @@ export const registerUserRoutes = (app: express.Express) => {
       }
 
       const result = await pool.query(
-        `SELECT id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at
+        `SELECT ${USER_PUBLIC_COLUMNS}
          FROM users
          ORDER BY created_at DESC`
       );
-      const response = result.rows.map((row) => ({
-        ...row,
-        is_admin: normalizeFlag(row.is_admin) ? 1 : 0,
-        must_change_password: normalizeFlag(row.must_change_password),
-      }));
+      const response = result.rows.map(normalizeUserRow);
       return res.json(response);
     } catch (error) {
       console.error("Fetch users failed:", error);
@@ -60,21 +57,16 @@ export const registerUserRoutes = (app: express.Express) => {
       const result = await pool.query(
         `INSERT INTO users (username, email, password, role, invited_by, invited_at, must_change_password)
          VALUES ($1, $2, $3, $4, $5, $6, TRUE)
-         RETURNING id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at`,
+         RETURNING ${USER_PUBLIC_COLUMNS}`,
         [username, email, passwordHash, normalizedRole, requester.id, invitedAt]
       );
-      const created = result.rows[0];
-      const response = {
-        ...created,
-        is_admin: normalizeFlag(created.is_admin) ? 1 : 0,
-        must_change_password: normalizeFlag(created.must_change_password),
-      };
+      const response = normalizeUserRow(result.rows[0]);
       await logAudit({
         req,
         actor: { id: requester.id, email: requester.email },
         action: "user.invite",
         entityType: "user",
-        entityId: created.id,
+        entityId: response.id,
         metadata: { username, email, role: normalizedRole },
       });
       return res.status(201).json({ user: response, tempPassword });
@@ -104,21 +96,16 @@ export const registerUserRoutes = (app: express.Express) => {
       const result = await pool.query(
         `INSERT INTO users (username, email, password, role, invited_by, invited_at, must_change_password)
          VALUES ($1, $2, $3, 'user', $4, $5, TRUE)
-         RETURNING id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at`,
+         RETURNING ${USER_PUBLIC_COLUMNS}`,
         [username, email, passwordHash, requester.id, invitedAt]
       );
-      const created = result.rows[0];
-      const response = {
-        ...created,
-        is_admin: normalizeFlag(created.is_admin) ? 1 : 0,
-        must_change_password: normalizeFlag(created.must_change_password),
-      };
+      const response = normalizeUserRow(result.rows[0]);
       await logAudit({
         req,
         actor: { id: requester.id, email: requester.email },
         action: "user.refer",
         entityType: "user",
-        entityId: created.id,
+        entityId: response.id,
         metadata: { username, email, role: "user" },
       });
       return res.status(201).json({ user: response, tempPassword });
@@ -143,7 +130,7 @@ export const registerUserRoutes = (app: express.Express) => {
 
     try {
       const result = await pool.query(
-        `SELECT id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at
+        `SELECT ${USER_PUBLIC_COLUMNS}
          FROM users
          WHERE id = $1`,
         [userId]
@@ -152,11 +139,7 @@ export const registerUserRoutes = (app: express.Express) => {
       if (!row) {
         return res.status(404).json({ error: "user not found" });
       }
-      return res.json({
-        ...row,
-        is_admin: normalizeFlag(row.is_admin) ? 1 : 0,
-        must_change_password: normalizeFlag(row.must_change_password),
-      });
+      return res.json(normalizeUserRow(row));
     } catch (error) {
       console.error("Fetch user failed:", error);
       return res.status(500).json({ error: "failed to fetch user" });
@@ -222,18 +205,14 @@ export const registerUserRoutes = (app: express.Express) => {
         `UPDATE users
          SET ${updates.join(", ")}
          WHERE id = $${paramIndex}
-         RETURNING id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at`,
+         RETURNING ${USER_PUBLIC_COLUMNS}`,
         [...params, userId]
       );
       const updated = result.rows[0];
       if (!updated) {
         return res.status(404).json({ error: "user not found" });
       }
-      const response = {
-        ...updated,
-        is_admin: normalizeFlag(updated.is_admin) ? 1 : 0,
-        must_change_password: normalizeFlag(updated.must_change_password),
-      };
+      const response = normalizeUserRow(updated);
       await logAudit({
         req,
         actor: { id: requester.id, email: requester.email },
@@ -316,18 +295,14 @@ export const registerUserRoutes = (app: express.Express) => {
         `UPDATE users
          SET role = $1
          WHERE id = $2
-         RETURNING id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at`,
+         RETURNING ${USER_PUBLIC_COLUMNS}`,
         [role, userId]
       );
       const updated = result.rows[0];
       if (!updated) {
         return res.status(404).json({ error: "user not found" });
       }
-      const response = {
-        ...updated,
-        is_admin: normalizeFlag(updated.is_admin) ? 1 : 0,
-        must_change_password: normalizeFlag(updated.must_change_password),
-      };
+      const response = normalizeUserRow(updated);
       await logAudit({
         req,
         actor: { id: requester.id, email: requester.email },

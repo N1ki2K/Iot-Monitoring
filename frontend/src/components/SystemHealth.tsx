@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { AuthUser, HealthStats } from '../types';
-import { ProfileMenu } from './ProfileMenu';
+import { AdminPageHeader } from './AdminPageHeader';
 import { HealthStatCard } from './HealthStatCard';
 import { useI18n } from '../useI18n';
+import { formatLocaleDateTime } from '../utils/format';
+import { isUserAdmin } from '../utils/flags';
 
 interface SystemHealthProps {
   user?: AuthUser | null;
   onLogout: () => void;
 }
-
-const normalizeFlag = (value: unknown) =>
-  value === true || value === 1 || value === '1' || value === 'true';
 
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return '0 B';
@@ -29,7 +28,7 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
   const [data, setData] = useState<HealthStats | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const isAdmin = Boolean(user && (normalizeFlag(user.is_admin) || user.role === 'admin'));
+  const isAdmin = isUserAdmin(user);
 
   useEffect(() => {
     const loadHealth = async () => {
@@ -69,70 +68,17 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
   return (
     <div className="min-h-screen p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
-        <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <NavLink to="/" className="flex items-center gap-3 mb-2">
-              <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900/80 border border-slate-700/60 shadow-lg shadow-cyan-500/10">
-                <img src="/IotMonitoring.png" alt="IoT Monitoring" className="w-12 h-12 object-contain" />
-              </div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-white">{t('common.systemHealth')}</h1>
-            </NavLink>
-            <p className="text-gray-400 text-sm">{t('health.subtitle')}</p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <nav className="flex items-center gap-1 rounded-full bg-slate-800/70 p-1">
-              <NavLink
-                to="/"
-                className={({ isActive }) =>
-                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
-                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
-                  }`
-                }
-                end
-              >
-                {t('common.dashboard')}
-              </NavLink>
-              <NavLink
-                to="/admin"
-                className={({ isActive }) =>
-                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
-                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
-                  }`
-                }
-              >
-                {t('common.adminDashboard')}
-              </NavLink>
-              {isAdmin && (
-                <NavLink
-                  to="/audit"
-                  className={({ isActive }) =>
-                    `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
-                      isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
-                    }`
-                  }
-                >
-                  {t('common.auditLogs')}
-                </NavLink>
-              )}
-              {isAdmin && (
-                <NavLink
-                  to="/health"
-                  className={({ isActive }) =>
-                    `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
-                      isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
-                    }`
-                  }
-                >
-                  {t('common.systemHealth')}
-                </NavLink>
-              )}
-            </nav>
-            {user && (
-              <ProfileMenu user={user} onLogout={onLogout} onSettings={() => navigate('/settings')} />
-            )}
-          </div>
-        </header>
+        <AdminPageHeader
+          title={t('common.systemHealth')}
+          subtitle={t('health.subtitle')}
+          dashboardLabel={t('common.dashboard')}
+          adminLabel={t('common.adminDashboard')}
+          auditLabel={t('common.auditLogs')}
+          healthLabel={t('common.systemHealth')}
+          user={user}
+          onLogout={onLogout}
+          onSettings={() => navigate('/settings')}
+        />
 
         {error && (
           <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
@@ -150,10 +96,10 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
           data && (
             <>
               <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <HealthStatCard label={t('health.uptime')} value={uptime} subLabel={t('health.serverTime', { time: new Date(data.serverTime).toLocaleString(locale) })} />
+                <HealthStatCard label={t('health.uptime')} value={uptime} subLabel={t('health.serverTime', { time: formatLocaleDateTime(data.serverTime, locale) })} />
                 <HealthStatCard label={t('health.totalRequests')} value={requestsTotal} subLabel={t('health.trackingSince', { time: new Date(data.requests.since).toLocaleTimeString(locale) })} />
                 <HealthStatCard label={t('health.databaseSize')} value={formatBytes(data.database.sizeBytes)} />
-                <HealthStatCard label={t('health.totalReadings')} value={data.devices.totalReadings} subLabel={data.devices.latestReadingAt ? t('health.lastReading', { time: new Date(data.devices.latestReadingAt).toLocaleString(locale) }) : t('health.noReadingsYet')} />
+                <HealthStatCard label={t('health.totalReadings')} value={data.devices.totalReadings} subLabel={data.devices.latestReadingAt ? t('health.lastReading', { time: formatLocaleDateTime(data.devices.latestReadingAt, locale) }) : t('health.noReadingsYet')} />
               </section>
 
               <section className="grid gap-4 lg:grid-cols-3">

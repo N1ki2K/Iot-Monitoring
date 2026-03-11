@@ -108,7 +108,7 @@ PGDATABASE=iot
 
 # MQTT
 MQTT_URL=mqtt://127.0.0.1:1883
-MQTT_TOPIC=iot/shrek-esp32/telemetry
+MQTT_TOPIC=iot/esp32/telemetry
 
 # Backend
 PORT=3000
@@ -184,7 +184,6 @@ CREATE TABLE users (
   password TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'user',
   is_admin BOOLEAN NOT NULL DEFAULT FALSE,
-  is_dev BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW()
 );
 

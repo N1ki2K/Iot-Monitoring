@@ -45,7 +45,6 @@ CREATE TABLE users (
   password TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'user',
   is_admin BOOLEAN NOT NULL DEFAULT FALSE,
-  is_dev BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -116,7 +115,7 @@ npm run migrate
 | `PGPASSWORD` | `iotpass`            | PostgreSQL password            |
 | `PGDATABASE` | `iot`                | PostgreSQL database name       |
 | `MQTT_URL`   | `mqtt://127.0.0.1:1883` | MQTT broker URL             |
-| `MQTT_TOPIC` | `iot/shrek-esp32/telemetry` | MQTT topic to subscribe  |
+| `MQTT_TOPIC` | `iot/esp32/telemetry` | MQTT topic to subscribe  |
 | `PORT`       | `3000`               | API server port                |
 
 ## Running the Services
@@ -138,8 +137,8 @@ MQTT_URL=mqtt://broker.hivemq.com:1883 npm run ingest
 Expected output:
 ```
 MQTT connected
-Subscribed to iot/shrek-esp32/telemetry
-inserted shrek-esp32 { t: 25.30, h: 60.50, lux: 1234, sound: 456, aq: 789 }
+Subscribed to iot/esp32/telemetry
+inserted esp32 { t: 25.30, h: 60.50, lux: 1234, sound: 456, aq: 789 }
 ```
 
 ### REST API Server
@@ -160,20 +159,20 @@ Returns a list of all device IDs that have sent data.
 
 **Response:**
 ```json
-["shrek-esp32", "other-device"]
+["esp32", "other-device"]
 ```
 
 ### GET /api/latest/:deviceId
 
 Returns the most recent reading for a device.
 
-**Example:** `GET /api/latest/shrek-esp32`
+**Example:** `GET /api/latest/esp32`
 
 **Response:**
 ```json
 {
   "id": 123,
-  "device_id": "shrek-esp32",
+  "device_id": "esp32",
   "ts": "2024-01-15T10:30:00.000Z",
   "temperature_c": "25.30",
   "humidity_pct": "60.50",
@@ -190,14 +189,14 @@ Returns historical readings for a device.
 **Query Parameters:**
 - `hours` (optional, default: 24) - Number of hours of history to return
 
-**Example:** `GET /api/history/shrek-esp32?hours=12`
+**Example:** `GET /api/history/esp32?hours=12`
 
 **Response:**
 ```json
 [
   {
     "id": 100,
-    "device_id": "shrek-esp32",
+    "device_id": "esp32",
     "ts": "2024-01-15T00:00:00.000Z",
     "temperature_c": "24.50",
     "humidity_pct": "58.00",

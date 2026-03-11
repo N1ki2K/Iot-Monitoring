@@ -36,6 +36,8 @@ describe("api endpoints", () => {
   let hashPassword: (password: string) => Promise<string>;
   let verifyPassword: (password: string, storedHash: string) => Promise<boolean>;
   let generatePairingCode: () => Promise<string>;
+  let extractPairingCode: (raw: unknown) => string | null;
+  let normalizeFlag: (value: unknown) => boolean;
   let ensureAdmin: (user: { role: string } | null) => boolean;
   let getRequester: (req: Request) => Promise<{ id: number; role: string } | null>;
 
@@ -47,15 +49,42 @@ describe("api endpoints", () => {
       hashPassword,
       verifyPassword,
       generatePairingCode,
+      extractPairingCode,
+      normalizeFlag,
       ensureAdmin,
       getRequester,
     } = await loadApi());
+  });
+
+  it("GET /api/health returns ok", async () => {
+    const res = await request(app).get("/api/health");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true });
   });
 
   it("hashPassword/verifyPassword round-trip", async () => {
     const hash = await hashPassword("secret");
     expect(await verifyPassword("secret", hash)).toBe(true);
     expect(await verifyPassword("nope", hash)).toBe(false);
+    expect(await verifyPassword("secret", "bad-format")).toBe(false);
+  });
+
+  it("normalizeFlag handles mixed values", () => {
+    expect(normalizeFlag(true)).toBe(true);
+    expect(normalizeFlag(1)).toBe(true);
+    expect(normalizeFlag("1")).toBe(true);
+    expect(normalizeFlag(false)).toBe(false);
+    expect(normalizeFlag("true")).toBe(false);
+  });
+
+  it("extractPairingCode handles supported payload formats", () => {
+    expect(extractPairingCode(12345)).toBe("12345");
+    expect(extractPairingCode("12345")).toBe("12345");
+    expect(extractPairingCode({ pairingCode: "12345" })).toBe("12345");
+    expect(extractPairingCode('{"code":"12345"}')).toBe("12345");
+    expect(extractPairingCode("https://example.com/claim?pairingCode=12345")).toBe("12345");
+    expect(extractPairingCode("claim code 12345 now")).toBe("12345");
+    expect(extractPairingCode("abc")).toBeNull();
   });
 
   it("ensureAdmin returns expected boolean", () => {
@@ -90,6 +119,13 @@ describe("api endpoints", () => {
     expect(queryMock).toHaveBeenCalledTimes(2);
   });
 
+  it("generatePairingCode throws after exhausting attempts", async () => {
+    for (let i = 0; i < 10; i += 1) {
+      queryMock.mockResolvedValueOnce({ rowCount: 1, rows: [1] });
+    }
+    await expect(generatePairingCode()).rejects.toThrow("Failed to generate unique pairing code");
+  });
+
   it("POST /api/auth/register validates payload", async () => {
     const res = await request(app).post("/api/auth/register").send({});
     expect(res.status).toBe(400);
@@ -110,6 +146,14 @@ describe("api endpoints", () => {
       .post("/api/auth/register")
       .send({ username: "User", email: "user@example.com", password: "pw" });
     expect(res.status).toBe(409);
+  });
+
+  it("POST /api/auth/register handles database error", async () => {
+    queryMock.mockRejectedValueOnce(new Error("db"));
+    const res = await request(app)
+      .post("/api/auth/register")
+      .send({ username: "User", email: "user@example.com", password: "pw" });
+    expect(res.status).toBe(500);
   });
 
   it("POST /api/auth/login validates payload", async () => {
@@ -144,6 +188,14 @@ describe("api endpoints", () => {
     expect(res.body.id).toBe(2);
   });
 
+  it("POST /api/auth/login handles database error", async () => {
+    queryMock.mockRejectedValueOnce(new Error("db"));
+    const res = await request(app)
+      .post("/api/auth/login")
+      .send({ email: "user@example.com", password: "pw" });
+    expect(res.status).toBe(500);
+  });
+
   it("GET /api/me requires auth", async () => {
     const res = await request(app).get("/api/me");
     expect(res.status).toBe(401);
@@ -162,6 +214,13 @@ describe("api endpoints", () => {
     expect(res.status).toBe(400);
   });
 
+  it("PATCH /api/me requires auth", async () => {
+    const res = await request(app)
+      .patch("/api/me")
+      .send({ username: "Updated", email: "user@example.com" });
+    expect(res.status).toBe(401);
+  });
+
   it("PATCH /api/me updates profile", async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [userRow] })
@@ -172,6 +231,30 @@ describe("api endpoints", () => {
       .send({ username: "Updated", email: "user@example.com" });
     expect(res.status).toBe(200);
     expect(res.body.username).toBe("Updated");
+  });
+
+  it("PATCH /api/me returns 409 on duplicate", async () => {
+    const err = new Error("duplicate");
+    Object.assign(err, { code: "23505" });
+    queryMock
+      .mockResolvedValueOnce({ rows: [userRow] })
+      .mockRejectedValueOnce(err);
+    const res = await request(app)
+      .patch("/api/me")
+      .set("x-user-id", "2")
+      .send({ username: "Updated", email: "user@example.com" });
+    expect(res.status).toBe(409);
+  });
+
+  it("PATCH /api/me returns 500 on database error", async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [userRow] })
+      .mockRejectedValueOnce(new Error("db"));
+    const res = await request(app)
+      .patch("/api/me")
+      .set("x-user-id", "2")
+      .send({ username: "Updated", email: "user@example.com" });
+    expect(res.status).toBe(500);
   });
 
   it("PATCH /api/me/password validates payload", async () => {
@@ -194,6 +277,17 @@ describe("api endpoints", () => {
     expect(res.status).toBe(401);
   });
 
+  it("PATCH /api/me/password returns 404 when requester user row is missing", async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [userRow] })
+      .mockResolvedValueOnce({ rows: [] });
+    const res = await request(app)
+      .patch("/api/me/password")
+      .set("x-user-id", "2")
+      .send({ currentPassword: "old", newPassword: "new" });
+    expect(res.status).toBe(404);
+  });
+
   it("PATCH /api/me/password updates password", async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [userRow] })
@@ -206,12 +300,41 @@ describe("api endpoints", () => {
     expect(res.status).toBe(204);
   });
 
+  it("PATCH /api/me/password returns 500 on database error", async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [userRow] })
+      .mockRejectedValueOnce(new Error("db"));
+    const res = await request(app)
+      .patch("/api/me/password")
+      .set("x-user-id", "2")
+      .send({ currentPassword: "old", newPassword: "new" });
+    expect(res.status).toBe(500);
+  });
+
   it("DELETE /api/me deletes account", async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [userRow] })
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app).delete("/api/me").set("x-user-id", "2");
     expect(res.status).toBe(204);
+  });
+
+  it("DELETE /api/me requires auth", async () => {
+    const res = await request(app).delete("/api/me");
+    expect(res.status).toBe(401);
+  });
+
+  it("DELETE /api/me returns 500 on database error", async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [userRow] })
+      .mockRejectedValueOnce(new Error("db"));
+    const res = await request(app).delete("/api/me").set("x-user-id", "2");
+    expect(res.status).toBe(500);
+  });
+
+  it("GET /api/users requires auth header", async () => {
+    const res = await request(app).get("/api/users");
+    expect(res.status).toBe(401);
   });
 
   it("GET /api/users requires admin", async () => {

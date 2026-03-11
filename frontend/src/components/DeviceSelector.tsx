@@ -1,4 +1,5 @@
 import { Cpu } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface DeviceOption {
   id: string;
@@ -13,6 +14,7 @@ interface DeviceSelectorProps {
 }
 
 export function DeviceSelector({ devices, selectedDevice, onSelect, isLoading }: DeviceSelectorProps) {
+  const { t } = useI18n();
   if (isLoading) {
     return (
       <div className="flex items-center gap-3">
@@ -24,7 +26,7 @@ export function DeviceSelector({ devices, selectedDevice, onSelect, isLoading }:
 
   return (
     <div className="flex items-center gap-3">
-      <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-slate-800/60 border border-slate-700/40 text-cyan-400">
+      <div className="theme-accent-tile flex items-center justify-center w-10 h-10 rounded-lg bg-slate-800/60 border border-slate-700/40 text-cyan-400">
         <Cpu className="w-5 h-5" />
       </div>
       <select
@@ -32,7 +34,7 @@ export function DeviceSelector({ devices, selectedDevice, onSelect, isLoading }:
         onChange={(e) => onSelect(e.target.value)}
         className="select min-w-[200px]"
       >
-        <option value="">All Devices</option>
+        <option value="">{t('deviceSelector.allDevices')}</option>
         {devices.map((device) => (
           <option key={device.id} value={device.id}>
             {device.label ? `${device.label} (${device.id})` : device.id}

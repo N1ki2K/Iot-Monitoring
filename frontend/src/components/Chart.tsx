@@ -12,6 +12,7 @@ import {
 import type { Reading } from '../types';
 import { getDisplayedSound } from '../utils/readings';
 import { getDisplayedAir } from '../utils/air';
+import { useI18n } from '../i18n';
 
 interface ChartProps {
   data: Reading[];
@@ -73,11 +74,12 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 };
 
 export const Chart = memo(function Chart({ data, title, lines, isLoading }: ChartProps) {
+  const { t, locale } = useI18n();
   const chartData: ChartDataPoint[] = data.map((reading) => {
     const date = new Date(reading.ts);
     return {
-      time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      fullTime: date.toLocaleString(),
+      time: date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
+      fullTime: date.toLocaleString(locale),
       temp: parseFloat(reading.temperature_c) || 0,
       humidity: parseFloat(reading.humidity_pct) || 0,
       lux: parseFloat(reading.lux) || 0,
@@ -101,7 +103,7 @@ export const Chart = memo(function Chart({ data, title, lines, isLoading }: Char
 
       {data.length === 0 ? (
         <div className="h-64 flex items-center justify-center text-gray-500">
-          No data available
+          {t('chart.noData')}
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={280}>

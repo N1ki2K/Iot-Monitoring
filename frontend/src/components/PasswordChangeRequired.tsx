@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { LockKeyhole } from 'lucide-react';
 import { api } from '../api';
 import type { AuthUser } from '../types';
+import { useI18n } from '../i18n';
 
 interface PasswordChangeRequiredProps {
   user: AuthUser;
@@ -18,6 +19,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 export function PasswordChangeRequired({ user, onUserUpdated, onLogout }: PasswordChangeRequiredProps) {
+  const { t } = useI18n();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -31,11 +33,11 @@ export function PasswordChangeRequired({ user, onUserUpdated, onLogout }: Passwo
     setStatus('');
 
     if (!currentPassword || !newPassword) {
-      setError('Enter your current and new password.');
+      setError(t('settings.enterCurrentAndNewPassword'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('auth.passwordsNoMatch'));
       return;
     }
 
@@ -44,9 +46,9 @@ export function PasswordChangeRequired({ user, onUserUpdated, onLogout }: Passwo
       await api.updatePassword({ currentPassword, newPassword });
       const refreshed = await api.getMe();
       onUserUpdated(refreshed);
-      setStatus('Password updated. Redirecting...');
+      setStatus(t('passwordChange.updatedRedirecting'));
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to update password.');
+      const message = getErrorMessage(error, t('settings.passwordUpdateFailed'));
       setError(message);
     } finally {
       setIsSubmitting(false);
@@ -61,14 +63,14 @@ export function PasswordChangeRequired({ user, onUserUpdated, onLogout }: Passwo
             <LockKeyhole className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold text-white">Password update required</h1>
-            <p className="text-sm text-gray-400 mt-1">Hi {user.username}, please set a new password.</p>
+            <h1 className="text-2xl font-semibold text-white">{t('passwordChange.title')}</h1>
+            <p className="text-sm text-gray-400 mt-1">{t('passwordChange.subtitle', { username: user.username })}</p>
           </div>
         </div>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           <div>
-            <label className="text-sm text-gray-300">Current password</label>
+            <label className="text-sm text-gray-300">{t('settings.currentPassword')}</label>
             <input
               type="password"
               className="input mt-2"
@@ -77,7 +79,7 @@ export function PasswordChangeRequired({ user, onUserUpdated, onLogout }: Passwo
             />
           </div>
           <div>
-            <label className="text-sm text-gray-300">New password</label>
+            <label className="text-sm text-gray-300">{t('settings.newPassword')}</label>
             <input
               type="password"
               className="input mt-2"
@@ -86,7 +88,7 @@ export function PasswordChangeRequired({ user, onUserUpdated, onLogout }: Passwo
             />
           </div>
           <div>
-            <label className="text-sm text-gray-300">Confirm new password</label>
+            <label className="text-sm text-gray-300">{t('auth.confirmPassword')}</label>
             <input
               type="password"
               className="input mt-2"
@@ -108,10 +110,10 @@ export function PasswordChangeRequired({ user, onUserUpdated, onLogout }: Passwo
 
           <div className="flex items-center justify-between">
             <button type="button" className="btn btn-ghost" onClick={onLogout}>
-              Log out
+              {t('passwordChange.logout')}
             </button>
             <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Updating...' : 'Update password'}
+              {isSubmitting ? t('passwordChange.updating') : t('settings.updatePassword')}
             </button>
           </div>
         </form>

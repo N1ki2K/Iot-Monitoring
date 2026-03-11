@@ -4,6 +4,7 @@ import { api } from '../api';
 import type { AuthUser, HealthStats } from '../types';
 import { ProfileMenu } from './ProfileMenu';
 import { HealthStatCard } from './HealthStatCard';
+import { useI18n } from '../i18n';
 
 interface SystemHealthProps {
   user?: AuthUser | null;
@@ -23,6 +24,7 @@ const formatBytes = (bytes: number) => {
 };
 
 export function SystemHealth({ user, onLogout }: SystemHealthProps) {
+  const { t, locale } = useI18n();
   const navigate = useNavigate();
   const [data, setData] = useState<HealthStats | null>(null);
   const [error, setError] = useState('');
@@ -42,7 +44,7 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
           error && typeof error === 'object' && 'response' in error
             ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
             : null;
-        setError(message || 'Failed to load health stats.');
+        setError(message || t('health.failed'));
       } finally {
         setIsLoading(false);
       }
@@ -70,9 +72,9 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900/80 border border-slate-700/60 shadow-lg shadow-cyan-500/10">
                 <img src="/IotMonitoring.png" alt="IoT Monitoring" className="w-12 h-12 object-contain" />
               </div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-white">System Health</h1>
+              <h1 className="text-2xl lg:text-3xl font-bold text-white">{t('common.systemHealth')}</h1>
             </NavLink>
-            <p className="text-gray-400 text-sm">Live metrics across users, devices, and database.</p>
+            <p className="text-gray-400 text-sm">{t('health.subtitle')}</p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -86,7 +88,7 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
                 }
                 end
               >
-                Dashboard
+                {t('common.dashboard')}
               </NavLink>
               <NavLink
                 to="/admin"
@@ -96,7 +98,7 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
                   }`
                 }
               >
-                Admin Dashboard
+                {t('common.adminDashboard')}
               </NavLink>
               {isAdmin && (
                 <NavLink
@@ -107,7 +109,7 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
                     }`
                   }
                 >
-                  Audit Logs
+                  {t('common.auditLogs')}
                 </NavLink>
               )}
               {isAdmin && (
@@ -119,7 +121,7 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
                     }`
                   }
                 >
-                  System Health
+                  {t('common.systemHealth')}
                 </NavLink>
               )}
             </nav>
@@ -145,43 +147,43 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
           data && (
             <>
               <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <HealthStatCard label="Uptime" value={uptime} subLabel={`Server time ${new Date(data.serverTime).toLocaleString()}`} />
-                <HealthStatCard label="Total Requests" value={requestsTotal} subLabel={`Tracking since ${new Date(data.requests.since).toLocaleTimeString()}`} />
-                <HealthStatCard label="Database Size" value={formatBytes(data.database.sizeBytes)} />
-                <HealthStatCard label="Total Readings" value={data.devices.totalReadings} subLabel={data.devices.latestReadingAt ? `Last reading ${new Date(data.devices.latestReadingAt).toLocaleString()}` : 'No readings yet'} />
+                <HealthStatCard label={t('health.uptime')} value={uptime} subLabel={t('health.serverTime', { time: new Date(data.serverTime).toLocaleString(locale) })} />
+                <HealthStatCard label={t('health.totalRequests')} value={requestsTotal} subLabel={t('health.trackingSince', { time: new Date(data.requests.since).toLocaleTimeString(locale) })} />
+                <HealthStatCard label={t('health.databaseSize')} value={formatBytes(data.database.sizeBytes)} />
+                <HealthStatCard label={t('health.totalReadings')} value={data.devices.totalReadings} subLabel={data.devices.latestReadingAt ? t('health.lastReading', { time: new Date(data.devices.latestReadingAt).toLocaleString(locale) }) : t('health.noReadingsYet')} />
               </section>
 
               <section className="grid gap-4 lg:grid-cols-3">
                 <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 p-6">
-                  <h3 className="text-lg font-semibold text-gray-200">Users</h3>
+                  <h3 className="text-lg font-semibold text-gray-200">{t('health.users')}</h3>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <HealthStatCard label="Total" value={data.users.total} />
-                    <HealthStatCard label="Admins" value={data.users.admins} />
-                    <HealthStatCard label="Invited" value={data.users.invited} />
-                    <HealthStatCard label="Must Change" value={data.users.mustChangePassword} />
+                    <HealthStatCard label={t('health.total')} value={data.users.total} />
+                    <HealthStatCard label={t('health.admins')} value={data.users.admins} />
+                    <HealthStatCard label={t('health.invited')} value={data.users.invited} />
+                    <HealthStatCard label={t('health.mustChange')} value={data.users.mustChangePassword} />
                   </div>
                 </div>
 
                 <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 p-6">
-                  <h3 className="text-lg font-semibold text-gray-200">Devices</h3>
+                  <h3 className="text-lg font-semibold text-gray-200">{t('health.devices')}</h3>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <HealthStatCard label="Controllers" value={data.devices.totalControllers} />
-                    <HealthStatCard label="Distinct Devices" value={data.devices.distinctDevices} />
-                    <HealthStatCard label="Active 24h" value={data.devices.activeDevicesLast24h} />
+                    <HealthStatCard label={t('health.controllers')} value={data.devices.totalControllers} />
+                    <HealthStatCard label={t('health.distinctDevices')} value={data.devices.distinctDevices} />
+                    <HealthStatCard label={t('health.active24h')} value={data.devices.activeDevicesLast24h} />
                   </div>
                 </div>
 
                 <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 p-6">
-                  <h3 className="text-lg font-semibold text-gray-200">Requests</h3>
+                  <h3 className="text-lg font-semibold text-gray-200">{t('health.requests')}</h3>
                   <div className="mt-4 space-y-2">
                     {Object.entries(data.requests.byStatus).length === 0 ? (
-                      <p className="text-sm text-gray-500">No request data yet.</p>
+                      <p className="text-sm text-gray-500">{t('health.noRequestData')}</p>
                     ) : (
                       Object.entries(data.requests.byStatus)
                         .sort(([a], [b]) => Number(a) - Number(b))
                         .map(([status, count]) => (
                           <div key={status} className="flex items-center justify-between text-sm text-gray-300">
-                            <span>Status {status}</span>
+                            <span>{t('health.status', { status })}</span>
                             <span className="text-white font-semibold">{count}</span>
                           </div>
                         ))
@@ -191,14 +193,14 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
               </section>
 
               <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 p-6">
-                <h3 className="text-lg font-semibold text-gray-200">Database Tables</h3>
+                <h3 className="text-lg font-semibold text-gray-200">{t('health.databaseTables')}</h3>
                 <div className="mt-4 overflow-x-auto">
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Table</th>
-                        <th>Rows</th>
-                        <th>Size</th>
+                        <th>{t('common.table')}</th>
+                        <th>{t('common.rows')}</th>
+                        <th>{t('common.size')}</th>
                       </tr>
                     </thead>
                     <tbody>

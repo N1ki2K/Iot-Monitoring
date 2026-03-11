@@ -3,6 +3,7 @@ import { NavLink, Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { AuthUser, AuditLogEntry, AuditLogQueryParams, PaginatedResponse } from '../types';
 import { ProfileMenu } from './ProfileMenu';
+import { useI18n } from '../i18n';
 
 interface AuditLogsProps {
   user?: AuthUser | null;
@@ -26,6 +27,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 export function AuditLogs({ user, onLogout }: AuditLogsProps) {
+  const { t, locale } = useI18n();
   const navigate = useNavigate();
   const isAdmin = isAdminUser(user);
   const [auditData, setAuditData] = useState<PaginatedResponse<AuditLogEntry> | null>(null);
@@ -55,7 +57,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
         });
         setAuditData(data);
       } catch (error) {
-        const message = getErrorMessage(error, 'Failed to load audit logs.');
+        const message = getErrorMessage(error, t('audit.loadFailed'));
         setAuditError(message);
         setAuditData(null);
       } finally {
@@ -73,7 +75,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
     if (actorIdRaw) {
       const actorId = Number(actorIdRaw);
       if (Number.isNaN(actorId)) {
-        setAuditError('Actor ID must be a number.');
+        setAuditError(t('audit.actorIdNumber'));
         return;
       }
       nextQuery.actorId = actorId;
@@ -129,9 +131,9 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900/80 border border-slate-700/60 shadow-lg shadow-cyan-500/10">
                 <img src="/IotMonitoring.png" alt="IoT Monitoring" className="w-12 h-12 object-contain" />
               </div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-white">IoT Monitoring</h1>
+              <h1 className="text-2xl lg:text-3xl font-bold text-white">{t('common.appName')}</h1>
             </NavLink>
-            <p className="text-gray-400 text-sm">Audit activity and change history</p>
+            <p className="text-gray-400 text-sm">{t('audit.subtitle')}</p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -145,7 +147,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                 }
                 end
               >
-                Dashboard
+                {t('common.dashboard')}
               </NavLink>
               <NavLink
                 to="/admin"
@@ -155,7 +157,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                   }`
                 }
               >
-                Admin Dashboard
+                {t('common.adminDashboard')}
               </NavLink>
               <NavLink
                 to="/audit"
@@ -165,7 +167,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                   }`
                 }
               >
-                Audit Logs
+                {t('common.auditLogs')}
               </NavLink>
               <NavLink
                 to="/health"
@@ -175,7 +177,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                   }`
                 }
               >
-                System Health
+                {t('common.systemHealth')}
               </NavLink>
             </nav>
             {user && (
@@ -186,13 +188,13 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
 
         <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
           <div className="p-4 border-b border-slate-700/40">
-            <h3 className="text-lg font-semibold text-gray-200">Audit Log</h3>
-            <p className="text-sm text-gray-400 mt-1">Track user actions and system changes.</p>
+            <h3 className="text-lg font-semibold text-gray-200">{t('audit.title')}</h3>
+            <p className="text-sm text-gray-400 mt-1">{t('audit.help')}</p>
           </div>
           <div className="p-4 space-y-4">
             <form className="grid gap-4 lg:grid-cols-6" onSubmit={handleAuditApply}>
               <div className="lg:col-span-1">
-                <label className="text-sm text-gray-300">Actor ID</label>
+                <label className="text-sm text-gray-300">{t('audit.actorId')}</label>
                 <input
                   className="input mt-2"
                   placeholder="123"
@@ -203,7 +205,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                 />
               </div>
               <div className="lg:col-span-2">
-                <label className="text-sm text-gray-300">Action</label>
+                <label className="text-sm text-gray-300">{t('common.action')}</label>
                 <input
                   className="input mt-2"
                   placeholder="user.login"
@@ -214,7 +216,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                 />
               </div>
               <div className="lg:col-span-2">
-                <label className="text-sm text-gray-300">Entity Type</label>
+                <label className="text-sm text-gray-300">{t('audit.entityType')}</label>
                 <input
                   className="input mt-2"
                   placeholder="controller"
@@ -225,7 +227,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                 />
               </div>
               <div className="lg:col-span-1">
-                <label className="text-sm text-gray-300">Entity ID</label>
+                <label className="text-sm text-gray-300">{t('audit.entityId')}</label>
                 <input
                   className="input mt-2"
                   placeholder="42"
@@ -236,7 +238,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                 />
               </div>
               <div className="lg:col-span-1">
-                <label className="text-sm text-gray-300">Rows</label>
+                <label className="text-sm text-gray-300">{t('common.rows')}</label>
                 <select
                   className="select w-full mt-2"
                   value={auditLimit}
@@ -253,10 +255,10 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
               </div>
               <div className="lg:col-span-1 flex items-end gap-2">
                 <button className="btn btn-primary w-full" type="submit">
-                  Apply
+                  {t('common.apply')}
                 </button>
                 <button className="btn btn-ghost w-full" type="button" onClick={handleAuditClear}>
-                  Clear
+                  {t('common.clear')}
                 </button>
               </div>
             </form>
@@ -271,13 +273,13 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="!cursor-default">Time</th>
-                    <th className="!cursor-default">Actor</th>
-                    <th className="!cursor-default">Action</th>
-                    <th className="!cursor-default">Entity</th>
-                    <th className="!cursor-default">Source</th>
-                    <th className="!cursor-default">IP</th>
-                    <th className="!cursor-default">Metadata</th>
+                    <th className="!cursor-default">{t('common.time')}</th>
+                    <th className="!cursor-default">{t('audit.actor')}</th>
+                    <th className="!cursor-default">{t('common.action')}</th>
+                    <th className="!cursor-default">{t('audit.entity')}</th>
+                    <th className="!cursor-default">{t('audit.source')}</th>
+                    <th className="!cursor-default">{t('audit.ip')}</th>
+                    <th className="!cursor-default">{t('audit.metadata')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -294,7 +296,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                   ) : auditData?.data.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="text-center py-8 text-gray-500">
-                        No audit entries found
+                        {t('audit.noEntries')}
                       </td>
                     </tr>
                   ) : (
@@ -303,7 +305,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                         ? entry.actor_email
                         : entry.actor_id
                           ? `User ${entry.actor_id}`
-                          : 'System';
+                          : t('audit.system');
                       const entityLabel = entry.entity_id
                         ? `${entry.entity_type} • ${entry.entity_id}`
                         : entry.entity_type;
@@ -314,7 +316,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                       const metadataText = formatAuditMetadata(entry.metadata);
                       return (
                         <tr key={entry.id}>
-                          <td>{new Date(entry.created_at).toLocaleString()}</td>
+                          <td>{new Date(entry.created_at).toLocaleString(locale)}</td>
                           <td title={actorLabel}>{actorLabel}</td>
                           <td>
                             <span className="badge bg-slate-700/60 text-slate-200 border border-slate-600/60">
@@ -337,7 +339,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
 
             {isAdmin && (
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-slate-700/40 pt-4">
-                <div className="text-sm text-gray-400">Admin tools: purge audit log entries.</div>
+                <div className="text-sm text-gray-400">{t('audit.adminTools')}</div>
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                   <input
                     className="input sm:w-60"
@@ -350,13 +352,13 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                     type="button"
                     onClick={async () => {
                       if (!auditPurgeBefore) {
-                        setAuditError('Select a date/time to purge before.');
+                        setAuditError(t('audit.selectPurgeDate'));
                         return;
                       }
                       try {
                         const beforeDate = new Date(auditPurgeBefore);
                         if (Number.isNaN(beforeDate.getTime())) {
-                          setAuditError('Invalid date/time for purge.');
+                          setAuditError(t('audit.invalidPurgeDate'));
                           return;
                         }
                         const beforeIso = beforeDate.toISOString();
@@ -369,18 +371,18 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                         setAuditData(data);
                         setAuditPage(1);
                       } catch (error) {
-                        const message = getErrorMessage(error, 'Failed to purge audit logs.');
+                        const message = getErrorMessage(error, t('audit.purgeFailed'));
                         setAuditError(message);
                       }
                     }}
                   >
-                    Purge Before
+                    {t('audit.purgeBefore')}
                   </button>
                   <button
                     className="btn btn-secondary"
                     type="button"
                     onClick={async () => {
-                      if (!confirm('Purge all audit logs? This cannot be undone.')) return;
+                      if (!confirm(t('audit.purgeAllConfirm'))) return;
                       try {
                         await api.purgeAuditLogs({ all: true });
                         const data = await api.getAuditLogs({
@@ -391,12 +393,12 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                         setAuditData(data);
                         setAuditPage(1);
                       } catch (error) {
-                        const message = getErrorMessage(error, 'Failed to purge audit logs.');
+                        const message = getErrorMessage(error, t('audit.purgeFailed'));
                         setAuditError(message);
                       }
                     }}
                   >
-                    Purge All
+                    {t('audit.purgeAll')}
                   </button>
                 </div>
               </div>
@@ -406,12 +408,14 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
               <p className="text-sm text-gray-500">
                 {auditData ? (
                   <>
-                    Showing {((auditPage - 1) * auditLimit) + 1} to{' '}
-                    {Math.min(auditPage * auditLimit, auditData.pagination.total)} of{' '}
-                    <span className="text-gray-300">{auditData.pagination.total}</span> events
+                    {t('audit.eventsShowing', {
+                      from: ((auditPage - 1) * auditLimit) + 1,
+                      to: Math.min(auditPage * auditLimit, auditData.pagination.total),
+                      total: auditData.pagination.total,
+                    })}
                   </>
                 ) : (
-                  'Loading...'
+                  t('common.loading')
                 )}
               </p>
               <div className="flex items-center gap-2">
@@ -420,10 +424,10 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                   disabled={auditPage === 1 || auditLoading}
                   className="btn btn-ghost"
                 >
-                  Prev
+                  {t('common.prev')}
                 </button>
                 <span className="text-sm text-gray-400">
-                  Page {auditPage} of {auditData?.pagination.totalPages || 1}
+                  {t('audit.pageOf', { page: auditPage, total: auditData?.pagination.totalPages || 1 })}
                 </span>
                 <button
                   onClick={() =>
@@ -434,7 +438,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                   disabled={auditLoading || (auditData ? auditPage >= auditData.pagination.totalPages : false)}
                   className="btn btn-ghost"
                 >
-                  Next
+                  {t('common.next')}
                 </button>
               </div>
             </div>
@@ -442,7 +446,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
         </section>
 
         <footer className="text-center text-gray-600 text-sm py-4">
-          <p>ESP32 IoT Monitoring System • Audit view</p>
+          <p>{t('audit.footer')}</p>
         </footer>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Shield, ArrowRight } from 'lucide-react';
 import { api } from '../api';
 import type { AuthUser } from '../types';
+import { useI18n } from '../i18n';
 
 type AuthMode = 'login' | 'register';
 
@@ -18,6 +19,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 export function Auth({ onAuth }: AuthProps) {
+  const { t } = useI18n();
   const [mode, setMode] = useState<AuthMode>('login');
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
@@ -50,11 +52,11 @@ export function Auth({ onAuth }: AuthProps) {
     try {
       if (mode === 'register') {
         if (!username || !email || !password) {
-          setError('Please fill in all required fields.');
+          setError(t('auth.fillRequired'));
           return;
         }
         if (password !== confirmPassword) {
-          setError('Passwords do not match.');
+          setError(t('auth.passwordsNoMatch'));
           return;
         }
         const created = await api.register({
@@ -66,7 +68,7 @@ export function Auth({ onAuth }: AuthProps) {
         onAuth(created);
       } else {
         if (!email || !password) {
-          setError('Please enter your email and password.');
+          setError(t('auth.enterCredentials'));
           return;
         }
         const loggedIn = await api.login({
@@ -77,7 +79,7 @@ export function Auth({ onAuth }: AuthProps) {
         onAuth(loggedIn);
       }
     } catch (err) {
-      const message = getErrorMessage(err, 'Something went wrong. Please try again.');
+      const message = getErrorMessage(err, t('auth.genericError'));
       setError(message);
     } finally {
       setIsSubmitting(false);
@@ -95,14 +97,13 @@ export function Auth({ onAuth }: AuthProps) {
             <div>
               <div className="inline-flex items-center gap-2 text-cyan-300 bg-cyan-400/10 border border-cyan-400/30 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-widest">
                 <Shield className="w-4 h-4" />
-                Secure Access
+                {t('auth.secureAccess')}
               </div>
               <h1 className="mt-6 text-3xl lg:text-4xl font-bold text-white">
-                IoT Monitoring Portal
+                {t('auth.portalTitle')}
               </h1>
               <p className="mt-3 text-gray-400 leading-relaxed">
-                Sign in to view real-time device data, history charts, and alerts in one place.
-                New here? Create an account in under a minute.
+                {t('auth.portalDescription')}
               </p>
             </div>
 
@@ -113,7 +114,7 @@ export function Auth({ onAuth }: AuthProps) {
                   <div className="w-8 h-8 rounded-full bg-slate-700 border border-slate-600" />
                   <div className="w-8 h-8 rounded-full bg-slate-700 border border-slate-600" />
                 </div>
-                <span>Trusted by makers building smart environments.</span>
+                <span>{t('auth.trustedBy')}</span>
               </div>
             </div>
           </div>
@@ -122,12 +123,12 @@ export function Auth({ onAuth }: AuthProps) {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-semibold text-white">
-                  {mode === 'login' ? 'Welcome back' : 'Create your account'}
+                  {mode === 'login' ? t('auth.welcomeBack') : t('auth.createAccount')}
                 </h2>
                 <p className="text-sm text-gray-400 mt-2">
                   {mode === 'login'
-                    ? 'Use your credentials to continue.'
-                    : 'Start monitoring sensors and devices instantly.'}
+                    ? t('auth.loginPrompt')
+                    : t('auth.registerPrompt')}
                 </p>
               </div>
               <div className="flex items-center rounded-full bg-slate-800/70 p-1 text-xs">
@@ -137,7 +138,7 @@ export function Auth({ onAuth }: AuthProps) {
                   }`}
                   onClick={() => handleModeChange('login')}
                 >
-                  Login
+                  {t('auth.login')}
                 </button>
                 <button
                   className={`px-3 py-1.5 rounded-full font-semibold ${
@@ -145,7 +146,7 @@ export function Auth({ onAuth }: AuthProps) {
                   }`}
                   onClick={() => handleModeChange('register')}
                 >
-                  Register
+                  {t('auth.register')}
                 </button>
               </div>
             </div>
@@ -153,7 +154,7 @@ export function Auth({ onAuth }: AuthProps) {
             <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
               {mode === 'register' && (
                 <div>
-                  <label className="text-sm text-gray-300">Full name</label>
+                  <label className="text-sm text-gray-300">{t('auth.fullName')}</label>
                   <div className="relative mt-2">
                     <input
                       className="input"
@@ -167,7 +168,7 @@ export function Auth({ onAuth }: AuthProps) {
 
               {mode === 'register' && (
                 <div>
-                  <label className="text-sm text-gray-300">Username</label>
+                  <label className="text-sm text-gray-300">{t('common.username')}</label>
                   <div className="relative mt-2">
                     <input
                       className="input"
@@ -180,7 +181,7 @@ export function Auth({ onAuth }: AuthProps) {
               )}
 
               <div>
-                <label className="text-sm text-gray-300">Email</label>
+                <label className="text-sm text-gray-300">{t('common.email')}</label>
                 <div className="relative mt-2">
                   <input
                     className="input"
@@ -192,7 +193,7 @@ export function Auth({ onAuth }: AuthProps) {
               </div>
 
               <div>
-                <label className="text-sm text-gray-300">Password</label>
+                <label className="text-sm text-gray-300">{t('auth.password')}</label>
                 <div className="relative mt-2">
                   <input
                     className="input"
@@ -206,14 +207,14 @@ export function Auth({ onAuth }: AuthProps) {
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-200"
                     onClick={() => setShowPassword((prev) => !prev)}
                   >
-                    {showPassword ? 'Hide' : 'Show'}
+                    {showPassword ? t('auth.hide') : t('auth.show')}
                   </button>
                 </div>
               </div>
 
               {mode === 'register' && (
                 <div>
-                  <label className="text-sm text-gray-300">Confirm password</label>
+                  <label className="text-sm text-gray-300">{t('auth.confirmPassword')}</label>
                   <div className="relative mt-2">
                     <input
                       className="input"
@@ -227,7 +228,7 @@ export function Auth({ onAuth }: AuthProps) {
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-200"
                       onClick={() => setShowConfirmPassword((prev) => !prev)}
                     >
-                      {showConfirmPassword ? 'Hide' : 'Show'}
+                      {showConfirmPassword ? t('auth.hide') : t('auth.show')}
                     </button>
                   </div>
                 </div>
@@ -236,10 +237,10 @@ export function Auth({ onAuth }: AuthProps) {
               <div className="flex items-center justify-between text-sm text-gray-400">
                 <label className="flex items-center gap-2">
                   <input type="checkbox" className="accent-cyan-500" />
-                  Remember me
+                  {t('auth.rememberMe')}
                 </label>
                 <button type="button" className="text-cyan-300 hover:text-cyan-200">
-                  Forgot password?
+                  {t('auth.forgotPassword')}
                 </button>
               </div>
 
@@ -248,10 +249,10 @@ export function Auth({ onAuth }: AuthProps) {
                 disabled={isSubmitting}
               >
                 {isSubmitting
-                  ? 'Submitting...'
+                  ? t('auth.submitting')
                   : mode === 'login'
-                    ? 'Sign in'
-                    : 'Create account'}
+                    ? t('auth.signIn')
+                    : t('auth.createAccountAction')}
                 <ArrowRight className="w-4 h-4" />
               </button>
 
@@ -264,13 +265,13 @@ export function Auth({ onAuth }: AuthProps) {
               {user && (
                 <div className="text-sm text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
                   {mode === 'login'
-                    ? `Welcome back, ${user.username}.`
-                    : `Account created for ${user.username}.`}
+                    ? t('auth.welcomeUser', { username: user.username })
+                    : t('auth.accountCreated', { username: user.username })}
                 </div>
               )}
 
               <p className="text-xs text-gray-500">
-                By continuing, you agree to the platform terms and data processing policy.
+                {t('auth.terms')}
               </p>
             </form>
           </div>

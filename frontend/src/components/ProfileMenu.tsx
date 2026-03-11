@@ -1,5 +1,7 @@
 import type { AuthUser } from '../types';
 import { isUserAdmin } from '../utils/flags';
+import { useI18n } from '../i18n';
+import { useTheme } from '../theme';
 
 interface ProfileMenuProps {
   user: AuthUser;
@@ -16,10 +18,12 @@ const getInitials = (value: string) =>
     .join('');
 
 export function ProfileMenu({ user, onLogout, onSettings }: ProfileMenuProps) {
+  const { language, setLanguage, t } = useI18n();
+  const { theme, setTheme } = useTheme();
   const label = user.username || user.email;
   const initials = getInitials(label);
   const isAdmin = isUserAdmin(user);
-  const roleLabel = isAdmin ? 'Admin' : 'User';
+  const roleLabel = isAdmin ? t('common.admin') : t('common.user');
 
   return (
     <details className="relative">
@@ -41,15 +45,37 @@ export function ProfileMenu({ user, onLogout, onSettings }: ProfileMenuProps) {
             onClick={onSettings}
             className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-slate-800/60 rounded-lg"
           >
-            Settings
+            {t('common.settings')}
           </button>
         )}
+        <div className="px-3 py-2">
+          <label className="mb-1 block text-xs text-gray-500">{t('profile.languageLabel')}</label>
+          <select
+            value={language}
+            onChange={(event) => setLanguage(event.target.value as 'en' | 'bg')}
+            className="select w-full text-sm"
+          >
+            <option value="en">{t('language.english')}</option>
+            <option value="bg">{t('language.bulgarian')}</option>
+          </select>
+        </div>
+        <div className="px-3 py-2">
+          <label className="mb-1 block text-xs text-gray-500">{t('common.theme')}</label>
+          <select
+            value={theme}
+            onChange={(event) => setTheme(event.target.value as 'dark' | 'light')}
+            className="select w-full text-sm"
+          >
+            <option value="dark">{t('theme.dark')}</option>
+            <option value="light">{t('theme.light')}</option>
+          </select>
+        </div>
         <button
           type="button"
           onClick={onLogout}
           className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-red-500/10 rounded-lg"
         >
-          Logout
+          {t('common.logout')}
         </button>
       </div>
     </details>

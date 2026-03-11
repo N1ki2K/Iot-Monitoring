@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import {
   LineChart,
   Line,
@@ -9,6 +10,8 @@ import {
   Legend,
 } from 'recharts';
 import type { Reading } from '../types';
+import { getDisplayedSound } from '../utils/readings';
+import { getDisplayedAir } from '../utils/air';
 
 interface ChartProps {
   data: Reading[];
@@ -17,6 +20,7 @@ interface ChartProps {
     dataKey: string;
     color: string;
     name: string;
+    yAxisId?: 'left' | 'right';
   }>;
   isLoading?: boolean;
 }
@@ -68,7 +72,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   );
 };
 
-export function Chart({ data, title, lines, isLoading }: ChartProps) {
+export const Chart = memo(function Chart({ data, title, lines, isLoading }: ChartProps) {
   const chartData: ChartDataPoint[] = data.map((reading) => {
     const date = new Date(reading.ts);
     return {
@@ -77,8 +81,8 @@ export function Chart({ data, title, lines, isLoading }: ChartProps) {
       temp: parseFloat(reading.temperature_c) || 0,
       humidity: parseFloat(reading.humidity_pct) || 0,
       lux: parseFloat(reading.lux) || 0,
-      sound: reading.sound || 0,
-      air: reading.co2_ppm || 0,
+      sound: getDisplayedSound(reading),
+      air: getDisplayedAir(reading),
     };
   });
 
@@ -101,7 +105,7 @@ export function Chart({ data, title, lines, isLoading }: ChartProps) {
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+          <LineChart data={chartData} margin={{ top: 5, right: 28, left: 8, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
             <XAxis
               dataKey="time"
@@ -111,11 +115,22 @@ export function Chart({ data, title, lines, isLoading }: ChartProps) {
               axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
             />
             <YAxis
+              yAxisId="left"
               stroke="#64748b"
               fontSize={12}
               tickLine={false}
               axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
             />
+            {lines.some((line) => line.yAxisId === 'right') && (
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                stroke="#64748b"
+                fontSize={12}
+                tickLine={false}
+                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+              />
+            )}
             <Tooltip content={<CustomTooltip />} />
             <Legend
               wrapperStyle={{ paddingTop: '20px' }}
@@ -126,6 +141,7 @@ export function Chart({ data, title, lines, isLoading }: ChartProps) {
                 key={line.dataKey}
                 type="monotone"
                 dataKey={line.dataKey}
+                yAxisId={line.yAxisId ?? 'left'}
                 stroke={line.color}
                 name={line.name}
                 strokeWidth={2}
@@ -138,6 +154,6 @@ export function Chart({ data, title, lines, isLoading }: ChartProps) {
       )}
     </div>
   );
-}
+});
 
 export default Chart;

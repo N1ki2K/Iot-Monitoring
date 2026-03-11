@@ -1323,7 +1323,7 @@ app.delete("/api/users/:userId/controllers", async (req, res) => {
     const requester = await getRequester(req);
 
     // Whitelist allowed sort columns
-    const allowedSortColumns = ["id", "device_id", "ts", "temperature_c", "humidity_pct", "lux", "sound", "co2_ppm"];
+    const allowedSortColumns = ["id", "device_id", "ts", "temperature_c", "humidity_pct", "lux", "sound", "sound_dbfs", "sound_est_spl", "air_quality_raw", "air_baseline_pct"];
     const safeSort = allowedSortColumns.includes(sortBy) ? sortBy : "ts";
 
     // Build WHERE clause
@@ -1364,7 +1364,7 @@ app.delete("/api/users/:userId/controllers", async (req, res) => {
     }
 
     // Parse search query with field prefixes
-    // Supported: t:(temp), h:(humidity), lux:(lux), s:(sound), co2:(co2), ts:(timestamp), d:(device)
+    // Supported: t:(temp), h:(humidity), lux:(lux), s:(sound raw), db:(sound dBFS), spl:(estimated SPL), airpct:(air baseline %), airraw:(air raw), ts:(timestamp), d:(device)
     // Supports operators: =, >, <, >=, <=, and ranges like 20-30
     if (search) {
       const fieldMap: Record<string, string> = {
@@ -1376,9 +1376,21 @@ app.delete("/api/users/:userId/controllers", async (req, res) => {
         l: "lux",
         s: "sound",
         sound: "sound",
-        co2: "co2_ppm",
-        air: "co2_ppm",
-        aq: "co2_ppm",
+        db: "sound_dbfs",
+        dbfs: "sound_dbfs",
+        sounddb: "sound_dbfs",
+        sound_dbfs: "sound_dbfs",
+        spl: "sound_est_spl",
+        soundspl: "sound_est_spl",
+        sound_est_spl: "sound_est_spl",
+        airpct: "air_baseline_pct",
+        airpercent: "air_baseline_pct",
+        air_baseline_pct: "air_baseline_pct",
+        airraw: "air_quality_raw",
+        air_quality_raw: "air_quality_raw",
+        co2: "air_quality_raw",
+        air: "air_quality_raw",
+        aq: "air_quality_raw",
         ts: "ts",
         date: "ts",
         time: "ts",

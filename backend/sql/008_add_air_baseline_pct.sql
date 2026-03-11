@@ -1,0 +1,2 @@
+ALTER TABLE readings
+ADD COLUMN IF NOT EXISTS air_baseline_pct DECIMAL(6,2);

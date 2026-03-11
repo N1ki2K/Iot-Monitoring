@@ -1,0 +1,2 @@
+ALTER TABLE readings
+ADD COLUMN IF NOT EXISTS sound_dbfs DECIMAL(6,2);

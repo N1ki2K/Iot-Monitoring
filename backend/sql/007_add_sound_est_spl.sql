@@ -1,0 +1,2 @@
+ALTER TABLE readings
+ADD COLUMN IF NOT EXISTS sound_est_spl DECIMAL(6,2);

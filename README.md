@@ -1,103 +1,168 @@
-codex resume 019cb889-8c19-7023-b732-bd757547a685
 # IoT Monitoring System
 
-Real-time IoT sensor monitoring system with ESP32 devices, MQTT ingestion, and a React dashboard.
+Monorepo for an IoT monitoring platform with ESP32 telemetry ingestion, a Node.js API, a React dashboard, shared TypeScript types, Docker-based local infrastructure, and an Android client.
 
-## Architecture
+## Overview
 
+The system ingests MQTT messages from devices, stores readings in PostgreSQL, and exposes them through an API consumed by the web frontend and mobile app.
+
+```text
+Physical ESP32 -> MQTT broker -> backend ingest -> PostgreSQL -> backend API -> web / mobile clients
 ```
-ESP32 (Wokwi) → MQTT Broker → Backend Ingest → PostgreSQL → Backend API → React Frontend
-```
+
+## What Is In This Repo
+
+- `backend/`: Express API, MQTT ingest worker, SQL migrations, and backend tests
+- `frontend/`: React + Vite dashboard for auth, monitoring, admin, audit, and health views
+- `packages/shared-types/`: shared TypeScript models used by frontend and backend
+- `infra/`: Docker Compose stack for Mosquitto, PostgreSQL, and Adminer
+- `device/`: ESP32 firmware for the physical board
+- `mobile/`: Android app and home-screen widget
+- `docs/`: hardware PDFs and project notes
 
 ## File Structure
 
-```
+```text
 Iot-Monitoring/
-├── .env                          # Centralized environment config
+├── .env
+├── package.json
 ├── README.md
-│
-├── backend/                      # Node.js + Express API
-│   ├── src/
-│   │   ├── api.ts               # REST API server (port 3000)
-│   │   └── ingest.ts            # MQTT → PostgreSQL ingestion
+├── backend/
 │   ├── package.json
-│   ├── tsconfig.json
-│   └── README.md
-│
-├── frontend/                     # React + Vite dashboard
-│   ├── src/
-│   │   ├── api/
-│   │   │   └── index.ts         # API client (axios)
-│   │   ├── components/
-│   │   │   ├── Chart.tsx        # Recharts line chart
-│   │   │   ├── Dashboard.tsx    # Main dashboard layout
-│   │   │   ├── DataTable.tsx    # Paginated data table
-│   │   │   ├── DeviceSelector.tsx
-│   │   │   ├── SensorCard.tsx   # Sensor metric cards
-│   │   │   └── index.ts
-│   │   ├── types/
-│   │   │   └── index.ts         # TypeScript interfaces
-│   │   ├── App.tsx
-│   │   ├── main.tsx
-│   │   └── index.css            # Tailwind v4 styles
-│   ├── index.html
-│   ├── vite.config.ts
-│   ├── tailwind.config.js
-│   ├── postcss.config.js
-│   ├── tsconfig.json
-│   └── README.md
-│
-├── device/                       # ESP32 firmware
-│   └── wokwi/
-│       ├── sketch.ino           # Arduino code for sensors
-│       └── diagram.json         # Wokwi circuit diagram
-│
-├── infra/                        # Infrastructure configs
-│   ├── mosquitto/               # MQTT broker config
-│   └── README.md
-│
-├── docs/                         # Documentation
-├── mobile/                       # Android app (Kotlin)
-│   ├── app/
-│   │   ├── src/main/
-│   │   │   ├── AndroidManifest.xml
-│   │   │   ├── java/com/monitoring/iotmon/
-│   │   │   │   └── MainActivity.kt
-│   │   │   └── res/
-│   │   │       ├── layout/
-│   │   │       │   └── widget_sensor.xml
-│   │   │       ├── drawable/     # Widget backgrounds + status icons
-│   │   │       ├── mipmap-*/     # Launcher icons
-│   │   │       ├── values/       # Colors, strings, theme
-│   │   │       └── xml/          # Backup + widget metadata
-│   │   ├── build.gradle.kts
-│   │   └── proguard-rules.pro
-│   ├── build.gradle.kts
-│   ├── settings.gradle.kts
-│   ├── gradle.properties
-│   ├── gradle/
-│   │   └── wrapper/
-│   ├── gradlew
-│   └── gradlew.bat
-├── packages/                     # Shared packages
-│   └── shared-types/            # Shared TypeScript types
-│       ├── src/
-│       │   ├── models/
-│       │   │   ├── user.ts      # User types (AuthUser, etc.)
-│       │   │   ├── reading.ts   # Reading types
-│       │   │   ├── controller.ts # Controller types
-│       │   │   └── api.ts       # API response types
+│   ├── README.md
+│   ├── scripts/
+│   │   └── migrate.ts
+│   ├── sql/
+│   │   ├── 001_create_audit_logs.sql
+│   │   ├── 002_add_user_role.sql
+│   │   ├── 003_add_user_is_dev.sql
+│   │   ├── 004_add_user_is_admin.sql
+│   │   ├── 005_add_user_invite_fields.sql
+│   │   ├── 006_add_sound_dbfs.sql
+│   │   ├── 007_add_sound_est_spl.sql
+│   │   ├── 008_add_air_baseline_pct.sql
+│   │   └── 009_rename_co2_ppm_to_air_quality_raw.sql
+│   └── src/
+│       ├── api.ts
+│       ├── api.test.ts
+│       ├── ingest.ts
+│       └── ingest.test.ts
+├── device/
+│   └── esp32/
+│       └── init/
+│           └── init.ino
+├── docs/
+│   ├── Espressif Systems_01292021_esp32.pdf
+│   ├── MQ-135-Gas-Sensor-Schematic.pdf
+│   ├── SNS-MQ135.pdf
+│   └── unit-tests-needed.md
+├── frontend/
+│   ├── package.json
+│   ├── README.md
+│   ├── public/
+│   └── src/
+│       ├── api/
+│       │   ├── index.ts
+│       │   └── index.test.ts
+│       ├── components/
+│       │   ├── AdminDashboard.tsx
+│       │   ├── AuditLogs.tsx
+│       │   ├── Auth.tsx
+│       │   ├── Chart.tsx
+│       │   ├── Dashboard.tsx
+│       │   ├── DataTable.tsx
+│       │   ├── DeviceSelector.tsx
+│       │   ├── HealthStatCard.tsx
+│       │   ├── PasswordChangeRequired.tsx
+│       │   ├── ProfileMenu.tsx
+│       │   ├── SensorCard.tsx
+│       │   ├── Settings.tsx
+│       │   ├── SystemHealth.tsx
+│       │   ├── UserInviteModal.tsx
 │       │   └── index.ts
+│       ├── test/
+│       │   └── setup.ts
+│       ├── types/
+│       │   └── index.ts
+│       ├── utils/
+│       │   ├── air.ts
+│       │   ├── flags.ts
+│       │   ├── flags.test.ts
+│       │   └── readings.ts
+│       ├── App.tsx
+│       ├── index.css
+│       └── main.tsx
+├── infra/
+│   ├── .env
+│   ├── .env.example
+│   ├── README.md
+│   ├── docker-compose.prod.yml
+│   ├── docker-compose.yml
+│   ├── mosquitto/
+│   └── postgres/
+├── mobile/
+│   ├── app/
+│   │   ├── build.gradle.kts
+│   │   ├── proguard-rules.pro
+│   │   └── src/main/
+│   │       ├── AndroidManifest.xml
+│   │       ├── java/
+│   │       └── res/
+│   ├── build.gradle.kts
+│   ├── gradle/
+│   ├── gradle.properties
+│   ├── gradlew
+│   ├── gradlew.bat
+│   └── settings.gradle.kts
+├── packages/
+│   └── shared-types/
 │       ├── package.json
-│       └── tsconfig.json
-└── tools/                        # Utility scripts (future)
+│       ├── tsconfig.json
+│       └── src/
+│           ├── index.ts
+│           └── models/
 ```
 
-## Quick Start
+## Current Features
 
-### 1. Setup Environment
+### Backend
 
-Copy and configure the `.env` file in the project root:
+- REST API with Express
+- MQTT ingest worker that writes sensor readings to PostgreSQL
+- user registration and login
+- account self-service endpoints: profile update, password change, account deletion
+- admin flows for inviting users, managing controllers, assigning devices, viewing audit logs, and viewing health stats
+- SQL migration runner in `backend/scripts/migrate.ts`
+
+### Frontend
+
+- login and registration flow
+- dashboard with latest reading cards, charts, device selection, and readings table
+- controller claiming by 5-digit pairing code or QR payload text
+- admin dashboard for users and controllers
+- audit log screen
+- system health screen
+- account settings and forced password-change flow
+
+### Mobile and Device
+
+- Android client under `mobile/`
+- Android home-screen widget declared in `AndroidManifest.xml`
+- physical ESP32 firmware under `device/esp32/init/init.ino`
+
+## Tech Stack
+
+- Backend: Node.js, Express, TypeScript, `pg`, `mqtt`
+- Frontend: React 19, Vite, TypeScript, Tailwind CSS, Recharts
+- Shared package: workspace-local TypeScript package
+- Infrastructure: PostgreSQL 16, Eclipse Mosquitto, Adminer, Docker Compose
+- Mobile: Android / Gradle / Kotlin
+
+## Environment Variables
+
+The backend loads the root `.env` file. The frontend uses `VITE_*` variables from the same workspace setup.
+
+Example root `.env`:
 
 ```env
 # PostgreSQL
@@ -111,60 +176,65 @@ PGDATABASE=iot
 MQTT_URL=mqtt://127.0.0.1:1883
 MQTT_TOPIC=iot/shrek-esp32/telemetry
 
-# Backend
+# API
 PORT=3000
+CORS_ORIGINS=http://localhost:5173
 
 # Frontend
 VITE_API_URL=http://localhost:3000/api
 
-# Mobile (change to device IP)
-MOBILE_API_URL=http://172.21.129.86:3000/api/ 
+# Mobile
+MOBILE_API_URL=http://YOUR-LAN-IP:3000/api
 ```
 
-### 2. Start Infrastructure (PostgreSQL + MQTT)
+Notes:
 
-Choose one:
+- `MOBILE_API_URL` must point to your machine's LAN IP for a physical device or emulator setup that cannot use browser localhost.
+- `infra/.env.example` contains Compose-specific database defaults for the infrastructure stack.
 
-**Option A: Docker Compose (recommended for local dev)**
+## Local Setup
+
+### 1. Install dependencies
+
+From the repo root:
 
 ```bash
-cd infra
-export POSTGRES_DB=iot
-export POSTGRES_USER=iot
-export POSTGRES_PASSWORD=iotpass
+npm install
+npm run build:types
+```
+
+### 2. Start infrastructure
+
+From `infra/`:
+
+```bash
+cp .env.example .env
 docker compose up -d
 ```
 
-This brings up:
-- MQTT broker on `localhost:1883`
+This starts:
+
+- Mosquitto on `localhost:1883`
 - PostgreSQL on `localhost:5432`
 - Adminer on `http://localhost:8080`
 
-**Option B: Use your own PostgreSQL + Mosquitto**
+### 3. Create the root `.env`
 
-Make sure PostgreSQL matches the `.env` values and the MQTT broker matches `MQTT_URL`.
+Create `/home/shrek/Documents/Projects/Iot-Monitoring/.env` using the example in the "Environment Variables" section and adjust values for your local services.
 
-### 3. Initialize the Database
+### 4. Create the database and base tables
 
-Open Adminer at `http://localhost:8080` and login with:
+If you are using the Docker Compose stack, PostgreSQL will already be running on `localhost:5432`. Create the database first:
 
-| Field    | Value      |
-|----------|------------|
-| System   | PostgreSQL |
-| Server   | `db`       |
-| Username | `iot`      |
-| Password | `iotpass`  |
-| Database | `iot`      |
+```bash
+psql -h 127.0.0.1 -p 5432 -U iot -d postgres -c "CREATE DATABASE iot;"
+```
 
-Click "SQL command" and run the following to create the database tables:
+Then connect and create the base schema:
 
 ```sql
-CREATE DATABASE iot;
-
-\c iot
-
 -- Sensor readings from IoT devices
-CREATE TABLE readings (
+CREATE TABLE IF NOT EXISTS readings (
   id SERIAL PRIMARY KEY,
   device_id VARCHAR(64) NOT NULL,
   ts TIMESTAMP DEFAULT NOW(),
@@ -175,10 +245,10 @@ CREATE TABLE readings (
   co2_ppm INTEGER
 );
 
-CREATE INDEX idx_readings_device_ts ON readings(device_id, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_readings_device_ts ON readings(device_id, ts DESC);
 
 -- User accounts
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   username VARCHAR(64) UNIQUE NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
@@ -190,7 +260,7 @@ CREATE TABLE users (
 );
 
 -- IoT controllers/devices
-CREATE TABLE controllers (
+CREATE TABLE IF NOT EXISTS controllers (
   id SERIAL PRIMARY KEY,
   device_id VARCHAR(64) UNIQUE NOT NULL,
   label TEXT,
@@ -198,8 +268,8 @@ CREATE TABLE controllers (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- User-to-controller assignments (many-to-many)
-CREATE TABLE user_controllers (
+-- User-to-controller assignments
+CREATE TABLE IF NOT EXISTS user_controllers (
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   controller_id INTEGER REFERENCES controllers(id) ON DELETE CASCADE,
   label TEXT,
@@ -207,8 +277,8 @@ CREATE TABLE user_controllers (
   PRIMARY KEY (user_id, controller_id)
 );
 
--- Audit logs for admin actions
-CREATE TABLE audit_logs (
+-- Audit logs
+CREATE TABLE IF NOT EXISTS audit_logs (
   id SERIAL PRIMARY KEY,
   actor_id INTEGER,
   actor_email TEXT,
@@ -221,146 +291,165 @@ CREATE TABLE audit_logs (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_audit_logs_created_at ON audit_logs (created_at DESC);
-CREATE INDEX idx_audit_logs_actor_id ON audit_logs (actor_id);
-CREATE INDEX idx_audit_logs_action ON audit_logs (action);
-CREATE INDEX idx_audit_logs_entity_type ON audit_logs (entity_type);
-CREATE INDEX idx_audit_logs_entity_id ON audit_logs (entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_id ON audit_logs (actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs (action);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_type ON audit_logs (entity_type);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_id ON audit_logs (entity_id);
 ```
 
-### Database Schema Overview
-
-| Table | Description |
-|-------|-------------|
-| `readings` | Sensor data from IoT devices (temperature, humidity, etc.) |
-| `users` | User accounts with roles and permissions |
-| `controllers` | Registered IoT controllers/devices |
-| `user_controllers` | Links users to their assigned controllers |
-| `audit_logs` | Tracks admin actions for security auditing |
-
-### 4. Install Dependencies
+Example `psql` session:
 
 ```bash
-# From project root - installs all workspaces
-npm install
-
-# Build shared types (required first time)
-npm run build:types
+psql -h 127.0.0.1 -p 5432 -U iot -d iot
 ```
 
-### 5. Run Everything
+Paste the SQL above into that session.
 
-**Option A: Run all together (from project root)**
+### 5. Run database migrations
+
+From the repo root:
 
 ```bash
-# API + Frontend
+npm run migrate -w backend
+```
+
+The migration files in `backend/sql/` add the newer columns used by the current backend, including invite metadata and the newer sound and air-quality fields.
+
+### 6. Start the app
+
+From the repo root:
+
+```bash
 npm run dev
+```
 
-# API + MQTT Ingest + Frontend
+Or run API, ingest, and frontend together:
+
+```bash
 npm run dev:all
 ```
 
-**Option B: Run individually (from project root)**
+Open `http://localhost:5173`.
 
-| Command              | Description                       |
-|----------------------|-----------------------------------|
-| `npm run dev`        | Runs API + Frontend together      |
-| `npm run dev:all`    | Runs API + MQTT Ingest + Frontend |
-| `npm run dev:api`    | Runs only the Backend API         |
-| `npm run dev:fe`     | Runs only the Frontend            |
-| `npm run dev:ingest` | Runs only MQTT Ingest             |
-| `npm run build`      | Builds shared-types + frontend    |
+## Workspace Scripts
 
-**Option C: Run from individual folders**
+### Root
 
-```bash
-# Backend (from backend/)
-cd backend
-npm install
-npm run api      # API server
-npm run ingest   # MQTT ingest (separate terminal)
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Run backend API and frontend together |
+| `npm run dev:all` | Run backend API, MQTT ingest worker, and frontend |
+| `npm run dev:api` | Run only the backend API |
+| `npm run dev:ingest` | Run only the MQTT ingest worker |
+| `npm run dev:fe` | Run only the frontend |
+| `npm run build` | Build shared types and frontend |
+| `npm run build:types` | Build shared TypeScript package |
+| `npm run build:fe` | Build frontend only |
+| `npm run install:all` | Install deps and build shared types |
+| `npm run test:all` | Run backend, frontend, and mobile tests |
 
-# Frontend (from frontend/)
-cd frontend
-npm install
-npm run dev
+### Backend
+
+| Command | Purpose |
+|---|---|
+| `npm run api -w backend` | Start API server |
+| `npm run ingest -w backend` | Start MQTT ingest worker |
+| `npm run migrate -w backend` | Apply SQL migrations |
+| `npm run test:ci -w backend` | Run backend tests with coverage |
+
+### Frontend
+
+| Command | Purpose |
+|---|---|
+| `npm run dev -w frontend` | Start Vite dev server |
+| `npm run build -w frontend` | Production build |
+| `npm run test:ci -w frontend` | Run frontend tests with coverage |
+
+## API Surface
+
+Representative endpoints exposed by `backend/src/api.ts`:
+
+### Auth and user
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/me`
+- `PATCH /api/me`
+- `PATCH /api/me/password`
+- `DELETE /api/me`
+- `GET /api/users`
+- `GET /api/users/:userId`
+- `PATCH /api/users/:userId`
+- `DELETE /api/users/:userId`
+- `PATCH /api/users/:userId/role`
+
+### Controllers and assignments
+
+- `GET /api/controllers`
+- `GET /api/controllers/available-devices`
+- `POST /api/controllers`
+- `POST /api/controllers/claim`
+- `DELETE /api/controllers/:controllerId`
+- `GET /api/users/:userId/controllers`
+- `POST /api/users/:userId/controllers`
+- `PATCH /api/users/:userId/controllers/:controllerId`
+- `DELETE /api/users/:userId/controllers`
+
+### Monitoring and admin
+
+- `GET /api/health`
+- `GET /api/admin/health`
+- `GET /api/audit`
+- `DELETE /api/audit`
+- `GET /api/devices`
+- `GET /api/latest/:deviceId`
+- `GET /api/history/:deviceId`
+- `GET /api/readings`
+
+## Sensor Payloads
+
+The ingest worker currently expects MQTT messages shaped like:
+
+```json
+{
+  "t": 23.4,
+  "h": 41.2,
+  "lux": 318,
+  "sound": 512,
+  "sound_dbfs": -42.1,
+  "sound_est_spl": 61.3,
+  "aq": 287,
+  "air_baseline_pct": 96.4
+}
 ```
 
-Open `http://localhost:5173`
+These are written into the `readings` table along with the device ID parsed from the MQTT topic.
 
-### 6. Start Wokwi Simulation
+## Physical ESP32 Firmware
 
-Run the ESP32 simulation on [wokwi.com](https://wokwi.com) or locally.
+The physical board firmware lives in `device/esp32/init/init.ino`.
 
-Update `device/wokwi/config.h` to match your broker:
-- For local Mosquitto: set `MQTT_HOST` to your machine IP on the LAN.
+- update the Wi-Fi and MQTT values in `device/esp32/init/init.ino`
+- keep the device topic aligned with `MQTT_TOPIC` in the root `.env`
+- flash the sketch to your ESP32 and verify it publishes telemetry over MQTT
 
-Make sure `MQTT_TOPIC` in `config.h` matches `MQTT_TOPIC` in `.env`.
+## Testing
 
-#### (Optional) Build Wokwi Firmware Locally
+Available automated tests:
 
-The repo already includes prebuilt firmware in `device/wokwi/build/`. If you want to rebuild it:
+- backend: Vitest in `backend/src/*.test.ts`
+- frontend: Vitest in `frontend/src/**/*.test.ts`
+- mobile: Gradle test task via `./gradlew test`
 
-```bash
-# Install ESP32 core
-arduino-cli core install esp32:esp32
-
-# Install required libraries
-arduino-cli lib install "DHT sensor library" "Adafruit Unified Sensor" "PubSubClient"
-
-# Compile the sketch into device/wokwi/build
-arduino-cli compile --fqbn esp32:esp32:esp32 device/wokwi --output-dir device/wokwi/build
-```
-
-## Sensors
-
-| Sensor        | Field       | Unit          |
-|---------------|-------------|---------------|
-| DHT22         | Temperature | °C            |
-| DHT22         | Humidity    | %             |
-| Photoresistor | Light       | lux (raw ADC) |
-| Microphone    | Sound       | raw ADC       |
-| MQ-135        | Air Quality | raw ADC       |
-
-## API Endpoints
-
-| Method | Endpoint                          | Description                    |
-|--------|-----------------------------------|--------------------------------|
-| GET    | `/api/devices`                    | List all devices               |
-| GET    | `/api/latest/:deviceId`           | Latest reading                 |
-| GET    | `/api/history/:deviceId?hours=24` | Historical readings            |
-| GET    | `/api/readings?page=1&limit=20`   | Paginated readings with search |
-
-See `backend/README.md` and `frontend/README.md` for full documentation.
-
-## Mobile App (Android)
-
-The Android app is built with Kotlin and Jetpack Compose.
-
-### Features
-- Real-time sensor dashboard
-- Push notifications with custom thresholds
-- Biometric authentication (fingerprint/face)
-- Home screen widget
-- QR code scanner for device claiming
-- Dark theme
-
-### Build & Run
+Run everything from the root:
 
 ```bash
-cd mobile
-
-# Build debug APK
-./gradlew assembleDebug
-
-# Install on connected device
-./gradlew installDebug
-
-# Or use Android Studio
+npm run test:all
 ```
 
-The APK will be at `mobile/app/build/outputs/apk/debug/app-debug.apk`
+## Additional Docs
 
-### Configuration
-
-Update `MOBILE_API_URL` in `.env` to point to your backend server's IP address (not localhost, use your machine's LAN IP for physical devices).
+- [backend README](/home/shrek/Documents/Projects/Iot-Monitoring/backend/README.md)
+- [frontend README](/home/shrek/Documents/Projects/Iot-Monitoring/frontend/README.md)
+- [infra README](/home/shrek/Documents/Projects/Iot-Monitoring/infra/README.md)

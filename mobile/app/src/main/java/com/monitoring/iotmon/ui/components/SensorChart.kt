@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.monitoring.iotmon.data.models.Reading
 import com.monitoring.iotmon.ui.theme.*
+import com.monitoring.iotmon.util.getDisplayedSound
 
 data class ChartLine(
     val label: String,
@@ -164,13 +165,13 @@ fun LightSoundChart(
     modifier: Modifier = Modifier
 ) {
     val lightValues = readings.mapNotNull { it.lux?.toFloat() }.takeLast(20)
-    val soundValues = readings.mapNotNull { it.sound?.toFloat() }.takeLast(20)
+    val soundValues = readings.mapNotNull { getDisplayedSound(it)?.toFloat() }.takeLast(20)
 
     SensorChart(
         title = "Light & Sound",
         lines = listOf(
             ChartLine("Light", LightColor, lightValues),
-            ChartLine("Sound", SoundColor, soundValues)
+            ChartLine("Sound dB", SoundColor, soundValues)
         ),
         modifier = modifier
     )

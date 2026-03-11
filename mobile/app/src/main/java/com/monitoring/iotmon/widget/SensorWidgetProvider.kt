@@ -14,6 +14,7 @@ import com.monitoring.iotmon.R
 import com.monitoring.iotmon.data.api.ApiClient
 import com.monitoring.iotmon.data.repository.IoTRepository
 import com.monitoring.iotmon.data.repository.Result
+import com.monitoring.iotmon.util.getDisplayedSound
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -230,7 +231,7 @@ class SensorWidgetProvider : AppWidgetProvider() {
                             val temp = reading.temperatureC?.let { "%.1f".format(it) } ?: "--"
                             val humidity = reading.humidityPct?.let { "%.0f".format(it) } ?: "--"
                             val light = reading.lux?.toString() ?: "--"
-                            val sound = reading.sound?.toString() ?: "--"
+                            val sound = getDisplayedSound(reading)?.let { "%.1f".format(it) } ?: "--"
                             val isOnline = isDeviceOnline(reading.ts)
 
                             val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())

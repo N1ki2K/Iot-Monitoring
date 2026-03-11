@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import com.monitoring.iotmon.data.models.Reading
 import com.monitoring.iotmon.ui.components.SensorType
 import com.monitoring.iotmon.ui.theme.*
+import com.monitoring.iotmon.util.getDisplayedAir
+import com.monitoring.iotmon.util.getDisplayedSound
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -64,16 +67,16 @@ fun SensorDetailScreen(
         ) { it.lux?.toDouble() }
         SensorType.SOUND -> SensorInfo(
             "Sound",
-            Icons.Default.VolumeUp,
+            Icons.AutoMirrored.Filled.VolumeUp,
             SoundColor,
             "dB"
-        ) { it.sound?.toDouble() }
+        ) { getDisplayedSound(it) }
         SensorType.AIR_QUALITY -> SensorInfo(
-            "Air Quality",
+            "Air vs Baseline",
             Icons.Default.Air,
             AirQualityColor,
-            "ppm"
-        ) { it.co2Ppm?.toDouble() }
+            "%"
+        ) { getDisplayedAir(it) }
     }
 
     // Sorting state

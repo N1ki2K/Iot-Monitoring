@@ -90,6 +90,7 @@ fun QRCodeDialog(
 ) {
     val clipboardManager = LocalClipboardManager.current
     var showCopied by remember { mutableStateOf(false) }
+    val colorScheme = MaterialTheme.colorScheme
 
     LaunchedEffect(showCopied) {
         if (showCopied) {
@@ -104,7 +105,7 @@ fun QRCodeDialog(
                 .fillMaxWidth()
                 .padding(16.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Slate800)
+            colors = CardDefaults.cardColors(containerColor = colorScheme.surface)
         ) {
             Column(
                 modifier = Modifier
@@ -127,7 +128,7 @@ fun QRCodeDialog(
                         Icon(
                             Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = Slate400
+                            tint = colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -139,7 +140,7 @@ fun QRCodeDialog(
                     Text(
                         text = deviceId,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Slate400
+                        color = colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -163,7 +164,7 @@ fun QRCodeDialog(
                 Text(
                     text = "Pairing Code",
                     style = MaterialTheme.typography.labelMedium,
-                    color = Slate400
+                    color = colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -176,7 +177,7 @@ fun QRCodeDialog(
                         text = code,
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Cyan500,
+                        color = colorScheme.primary,
                         letterSpacing = androidx.compose.ui.unit.TextUnit(4f, androidx.compose.ui.unit.TextUnitType.Sp)
                     )
 
@@ -191,7 +192,7 @@ fun QRCodeDialog(
                         Icon(
                             Icons.Default.ContentCopy,
                             contentDescription = "Copy code",
-                            tint = if (showCopied) SuccessColor else Slate400
+                            tint = if (showCopied) SuccessColor else colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -209,7 +210,7 @@ fun QRCodeDialog(
                 Text(
                     text = "Scan this QR code or enter the pairing code to claim this device",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Slate400,
+                    color = colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
             }

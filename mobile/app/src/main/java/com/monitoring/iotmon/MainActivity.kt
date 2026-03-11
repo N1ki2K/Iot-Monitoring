@@ -27,8 +27,10 @@ import com.monitoring.iotmon.ui.components.ClaimDeviceDialog
 import com.monitoring.iotmon.ui.components.SensorType
 import com.monitoring.iotmon.ui.navigation.Screen
 import com.monitoring.iotmon.ui.screens.AdminScreen
+import com.monitoring.iotmon.ui.screens.AuditLogsScreen
 import com.monitoring.iotmon.ui.screens.AuthScreen
 import com.monitoring.iotmon.ui.screens.DashboardScreen
+import com.monitoring.iotmon.ui.screens.SystemHealthScreen
 import com.monitoring.iotmon.ui.screens.SensorDetailScreen
 import com.monitoring.iotmon.ui.screens.NotificationSettingsScreen
 import com.monitoring.iotmon.ui.screens.SettingsScreen
@@ -37,10 +39,12 @@ import com.monitoring.iotmon.ui.theme.Cyan500
 import com.monitoring.iotmon.ui.theme.Slate900
 import com.monitoring.iotmon.ui.theme.Slate950
 import com.monitoring.iotmon.ui.viewmodel.AdminViewModel
+import com.monitoring.iotmon.ui.viewmodel.AuditLogsViewModel
 import com.monitoring.iotmon.ui.viewmodel.NotificationSettingsViewModel
 import com.monitoring.iotmon.ui.viewmodel.AuthViewModel
 import com.monitoring.iotmon.ui.viewmodel.DashboardViewModel
 import com.monitoring.iotmon.ui.viewmodel.SettingsViewModel
+import com.monitoring.iotmon.ui.viewmodel.SystemHealthViewModel
 import com.monitoring.iotmon.util.BiometricHelper
 import com.monitoring.iotmon.util.BiometricResult
 import com.monitoring.iotmon.util.NotificationHelper
@@ -226,7 +230,11 @@ fun IoTMonitorApp(
     val dashboardState by dashboardViewModel.state.collectAsState()
     val settingsState by settingsViewModel.state.collectAsState()
     val adminState by adminViewModel.state.collectAsState()
+    val auditLogsViewModel: AuditLogsViewModel = viewModel()
+    val auditLogsState by auditLogsViewModel.state.collectAsState()
     val notificationSettingsState by notificationSettingsViewModel.state.collectAsState()
+    val systemHealthViewModel: SystemHealthViewModel = viewModel()
+    val systemHealthState by systemHealthViewModel.state.collectAsState()
 
     var showClaimDialog by remember { mutableStateOf(false) }
 
@@ -307,6 +315,14 @@ fun IoTMonitorApp(
                         adminViewModel.loadData()
                         navController.navigate(Screen.Admin.route)
                     },
+                    onAuditLogsClick = {
+                        auditLogsViewModel.loadLogs()
+                        navController.navigate(Screen.AuditLogs.route)
+                    },
+                    onSystemHealthClick = {
+                        systemHealthViewModel.loadHealth()
+                        navController.navigate(Screen.SystemHealth.route)
+                    },
                     onClaimDevice = { showClaimDialog = true },
                     onLogout = { authViewModel.logout() },
                     onSensorClick = { sensorType ->
@@ -368,6 +384,9 @@ fun IoTMonitorApp(
                         // Reload devices after removal
                         dashboardViewModel.loadDevices(user.id, user.isAdmin == 1)
                     },
+                    onReferFriend = { username, email ->
+                        settingsViewModel.referFriend(username, email)
+                    },
                     onToggleDarkMode = onToggleDarkMode,
                     onNotificationSettingsClick = {
                         navController.navigate(Screen.NotificationSettings.route)
@@ -397,7 +416,8 @@ fun IoTMonitorApp(
                         }
                     },
                     onClearError = { settingsViewModel.clearError() },
-                    onClearSuccess = { settingsViewModel.clearSuccessMessage() }
+                    onClearSuccess = { settingsViewModel.clearSuccessMessage() },
+                    onClearReferralResponse = { settingsViewModel.clearReferralResponse() }
                 )
             }
         }
@@ -408,7 +428,60 @@ fun IoTMonitorApp(
                 AdminScreen(
                     state = adminState,
                     onBack = { navController.popBackStack() },
-                    onRefresh = { adminViewModel.refresh() }
+                    onRefresh = { adminViewModel.refresh() },
+                    onInviteUser = { username, email, role ->
+                        adminViewModel.inviteUser(username, email, role)
+                    },
+                    onDeleteUser = { userId ->
+                        adminViewModel.deleteUser(userId)
+                    },
+                    onSelectUser = { userId ->
+                        adminViewModel.selectUser(userId)
+                    },
+                    onAssignController = { controllerId ->
+                        adminViewModel.assignController(controllerId)
+                    },
+                    onRemoveAssignment = { controllerId ->
+                        adminViewModel.removeAssignment(controllerId)
+                    },
+                    onCreateController = { deviceId, label ->
+                        adminViewModel.createController(deviceId, label)
+                    },
+                    onDeleteController = { controllerId ->
+                        adminViewModel.deleteController(controllerId)
+                    },
+                    onClearMessages = { adminViewModel.clearMessages() }
+                )
+            }
+        }
+
+        composable(Screen.AuditLogs.route) {
+            val user = authState.user
+            if (user != null && user.isAdmin == 1) {
+                AuditLogsScreen(
+                    state = auditLogsState,
+                    onBack = { navController.popBackStack() },
+                    onRefresh = { auditLogsViewModel.loadLogs() },
+                    onUpdateFilters = { actorId, action, entityType, entityId, limit ->
+                        auditLogsViewModel.updateFilters(actorId, action, entityType, entityId, limit)
+                    },
+                    onClearFilters = { auditLogsViewModel.clearFilters() },
+                    onNextPage = { auditLogsViewModel.nextPage() },
+                    onPreviousPage = { auditLogsViewModel.previousPage() },
+                    onPurgeBeforeChange = { auditLogsViewModel.setPurgeBefore(it) },
+                    onPurgeBefore = { auditLogsViewModel.purgeBefore() },
+                    onPurgeAll = { auditLogsViewModel.purgeAll() }
+                )
+            }
+        }
+
+        composable(Screen.SystemHealth.route) {
+            val user = authState.user
+            if (user != null && user.isAdmin == 1) {
+                SystemHealthScreen(
+                    state = systemHealthState,
+                    onBack = { navController.popBackStack() },
+                    onRefresh = { systemHealthViewModel.loadHealth() }
                 )
             }
         }

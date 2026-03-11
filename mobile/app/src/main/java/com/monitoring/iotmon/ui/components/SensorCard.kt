@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -12,10 +13,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.monitoring.iotmon.data.models.Reading
 import com.monitoring.iotmon.ui.theme.*
+import com.monitoring.iotmon.util.getDisplayedAir
+import com.monitoring.iotmon.util.getDisplayedSound
 
 enum class SensorType {
     TEMPERATURE,
@@ -33,7 +38,8 @@ fun SensorCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null
 ) {
-    val cardColors = CardDefaults.cardColors(containerColor = Slate800)
+    val colorScheme = MaterialTheme.colorScheme
+    val cardColors = CardDefaults.cardColors(containerColor = colorScheme.surface)
     val cardShape = RoundedCornerShape(16.dp)
 
     if (onClick != null) {
@@ -62,13 +68,17 @@ private fun SensorCardContent(
     value: String?,
     unit: String
 ) {
+    val colorScheme = MaterialTheme.colorScheme
     val (icon, color, label) = when (type) {
         SensorType.TEMPERATURE -> Triple(Icons.Default.Thermostat, TemperatureColor, "Temperature")
         SensorType.HUMIDITY -> Triple(Icons.Default.WaterDrop, HumidityColor, "Humidity")
         SensorType.LIGHT -> Triple(Icons.Default.WbSunny, LightColor, "Light")
-        SensorType.SOUND -> Triple(Icons.Default.VolumeUp, SoundColor, "Sound")
-        SensorType.AIR_QUALITY -> Triple(Icons.Default.Air, AirQualityColor, "Air Quality")
+        SensorType.SOUND -> Triple(Icons.AutoMirrored.Filled.VolumeUp, SoundColor, "Sound")
+        SensorType.AIR_QUALITY -> Triple(Icons.Default.Air, AirQualityColor, "Air vs Baseline")
     }
+
+    val iconContainerColor =
+        if (colorScheme.surface.luminance() > 0.5f) Color.White else color.copy(alpha = 0.16f)
 
     Column(
         modifier = Modifier
@@ -81,14 +91,7 @@ private fun SensorCardContent(
             modifier = Modifier
                 .size(48.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            color.copy(alpha = 0.3f),
-                            color.copy(alpha = 0.1f)
-                        )
-                    )
-                ),
+                .background(iconContainerColor),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -105,7 +108,7 @@ private fun SensorCardContent(
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = Slate400
+            color = colorScheme.onSurfaceVariant
         )
 
         Spacer(modifier = Modifier.height(4.dp))
@@ -120,13 +123,13 @@ private fun SensorCardContent(
                     text = value,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = unit,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Slate400,
+                    color = colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
@@ -137,7 +140,7 @@ private fun SensorCardContent(
                     .width(60.dp)
                     .height(32.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(Slate700)
+                    .background(colorScheme.surfaceVariant)
             )
         }
     }
@@ -145,14 +148,13 @@ private fun SensorCardContent(
 
 @Composable
 fun SensorCardsGrid(
-    temperature: Double?,
-    humidity: Double?,
-    light: Int?,
-    sound: Int?,
-    airQuality: Int?,
+    reading: Reading,
     modifier: Modifier = Modifier,
     onSensorClick: (SensorType) -> Unit = {}
 ) {
+    val displayedSound = getDisplayedSound(reading)
+    val displayedAir = getDisplayedAir(reading)
+
     Column(modifier = modifier) {
         // First row - Temperature and Humidity
         Row(
@@ -161,14 +163,14 @@ fun SensorCardsGrid(
         ) {
             SensorCard(
                 type = SensorType.TEMPERATURE,
-                value = temperature?.let { String.format("%.1f", it) },
+                value = reading.temperatureC?.let { String.format("%.1f", it) },
                 unit = "°C",
                 modifier = Modifier.weight(1f),
                 onClick = { onSensorClick(SensorType.TEMPERATURE) }
             )
             SensorCard(
                 type = SensorType.HUMIDITY,
-                value = humidity?.let { String.format("%.1f", it) },
+                value = reading.humidityPct?.let { String.format("%.1f", it) },
                 unit = "%",
                 modifier = Modifier.weight(1f),
                 onClick = { onSensorClick(SensorType.HUMIDITY) }
@@ -184,22 +186,22 @@ fun SensorCardsGrid(
         ) {
             SensorCard(
                 type = SensorType.LIGHT,
-                value = light?.toString(),
+                value = reading.lux?.toString(),
                 unit = "lux",
                 modifier = Modifier.weight(1f),
                 onClick = { onSensorClick(SensorType.LIGHT) }
             )
             SensorCard(
                 type = SensorType.SOUND,
-                value = sound?.toString(),
+                value = displayedSound?.let { String.format("%.1f", it) },
                 unit = "dB",
                 modifier = Modifier.weight(1f),
                 onClick = { onSensorClick(SensorType.SOUND) }
             )
             SensorCard(
                 type = SensorType.AIR_QUALITY,
-                value = airQuality?.toString(),
-                unit = "ppm",
+                value = displayedAir?.let { String.format("%.1f", it) },
+                unit = "%",
                 modifier = Modifier.weight(1f),
                 onClick = { onSensorClick(SensorType.AIR_QUALITY) }
             )

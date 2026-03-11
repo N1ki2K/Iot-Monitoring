@@ -596,7 +596,9 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
           error={inviteError}
           response={inviteResponse}
           values={inviteForm}
-          onChange={(next) => setInviteForm((prev) => ({ ...prev, ...next }))}
+          onChange={(next) =>
+            setInviteForm((prev: UserInviteRequest) => ({ ...prev, ...next }))
+          }
           onSubmit={handleInviteSubmit}
           onClose={() => {
             setShowInviteModal(false);

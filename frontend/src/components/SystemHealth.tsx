@@ -62,6 +62,9 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
 
   const requestsTotal = data?.requests.total ?? 0;
   const uptime = data ? `${Math.floor(data.uptimeSeconds / 3600)}h` : '-';
+  const requestStatusEntries: Array<[string, number]> = data
+    ? Object.entries(data.requests.byStatus)
+    : [];
 
   return (
     <div className="min-h-screen p-6 lg:p-8">
@@ -176,10 +179,10 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
                 <div className="bg-slate-800/40 rounded-xl border border-slate-700/40 p-6">
                   <h3 className="text-lg font-semibold text-gray-200">{t('health.requests')}</h3>
                   <div className="mt-4 space-y-2">
-                    {Object.entries(data.requests.byStatus).length === 0 ? (
+                    {requestStatusEntries.length === 0 ? (
                       <p className="text-sm text-gray-500">{t('health.noRequestData')}</p>
                     ) : (
-                      Object.entries(data.requests.byStatus)
+                      requestStatusEntries
                         .sort(([a], [b]) => Number(a) - Number(b))
                         .map(([status, count]) => (
                           <div key={status} className="flex items-center justify-between text-sm text-gray-300">
@@ -204,7 +207,7 @@ export function SystemHealth({ user, onLogout }: SystemHealthProps) {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.database.tableSizes.map((table) => (
+                      {data.database.tableSizes.map((table: HealthStats['database']['tableSizes'][number]) => (
                         <tr key={table.table}>
                           <td>{table.table}</td>
                           <td>{table.rows}</td>

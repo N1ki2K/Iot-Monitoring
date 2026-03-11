@@ -1,7 +1,6 @@
-type AirReading = {
-  air_baseline_pct?: unknown;
-  air_quality_raw?: unknown;
-};
+import type { Reading } from '../types';
+
+type AirReading = Partial<Pick<Reading, 'air_baseline_pct' | 'air_quality_raw'>>;
 
 export const getDisplayedAir = (reading: AirReading | null | undefined): number => {
   if (!reading) return 0;

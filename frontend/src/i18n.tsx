@@ -4,7 +4,12 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { I18nContext, type Language, type TranslationParams } from './useI18n';
+import {
+  I18nContext,
+  type I18nContextValue,
+  type Language,
+  type TranslationParams,
+} from './useI18n';
 
 const LANGUAGE_STORAGE_KEY = 'appLanguage';
 
@@ -543,7 +548,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       language,
       locale,
       setLanguage,
-      t: (key, params) => {
+      t: (key: string, params?: TranslationParams) => {
         const template = dictionaries[language][key] ?? dictionaries.en[key] ?? key;
         return interpolate(template, params);
       },

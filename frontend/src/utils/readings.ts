@@ -1,8 +1,6 @@
-type SoundReading = {
-  sound?: unknown;
-  sound_dbfs?: unknown;
-  sound_est_spl?: unknown;
-};
+import type { Reading } from '../types';
+
+type SoundReading = Partial<Pick<Reading, 'sound' | 'sound_dbfs' | 'sound_est_spl'>>;
 
 export const getDisplayedSound = (reading: SoundReading | null | undefined): number => {
   if (!reading) return 0;

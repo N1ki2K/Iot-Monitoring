@@ -12,6 +12,7 @@ import {
 import type { Reading } from '../types';
 import { getDisplayedSound } from '../utils/readings';
 import { getDisplayedAir } from '../utils/air';
+import { formatLocaleDateTime } from '../utils/format';
 import { useI18n } from '../useI18n';
 
 interface ChartProps {
@@ -79,7 +80,7 @@ export const Chart = memo(function Chart({ data, title, lines, isLoading }: Char
     const date = new Date(reading.ts);
     return {
       time: date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
-      fullTime: date.toLocaleString(locale),
+      fullTime: formatLocaleDateTime(date, locale),
       temp: parseFloat(reading.temperature_c) || 0,
       humidity: parseFloat(reading.humidity_pct) || 0,
       lux: parseFloat(reading.lux) || 0,

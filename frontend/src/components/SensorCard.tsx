@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Thermometer, Droplets, Sun, Volume2, Wind } from 'lucide-react';
 import type { SensorType } from '../types';
+import { formatFixedNumber } from '../utils/format';
 
 interface SensorCardProps {
   type: SensorType;
@@ -83,7 +84,7 @@ export const SensorCard = memo(function SensorCard({ type, value, unit, label, i
         {/* Value */}
         <div className="flex items-baseline gap-1">
           <span className={`text-3xl font-bold font-mono ${config.color} tracking-tight`}>
-            {typeof value === 'number' ? value.toFixed(1) : '--'}
+            {formatFixedNumber(value, 1)}
           </span>
           <span className="text-gray-500 text-sm font-medium">{unit}</span>
         </div>

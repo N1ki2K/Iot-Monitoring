@@ -1,22 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { NavLink, Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { AuthUser, AuditLogEntry, AuditLogQueryParams, PaginatedResponse } from '../types';
-import { ProfileMenu } from './ProfileMenu';
+import { AdminPageHeader } from './AdminPageHeader';
 import { useI18n } from '../useI18n';
+import { formatLocaleDateTime } from '../utils/format';
+import { isUserAdmin } from '../utils/flags';
 
 interface AuditLogsProps {
   user?: AuthUser | null;
   onLogout: () => void;
 }
-
-const normalizeFlag = (value: unknown) =>
-  value === true || value === 1 || value === '1' || value === 'true';
-
-const isAdminUser = (user?: AuthUser | null) => {
-  if (!user) return false;
-  return normalizeFlag(user.is_admin) || user.role === 'admin';
-};
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error && typeof error === 'object' && 'response' in error) {
@@ -29,7 +23,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 export function AuditLogs({ user, onLogout }: AuditLogsProps) {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
-  const isAdmin = isAdminUser(user);
+  const isAdmin = isUserAdmin(user);
   const [auditData, setAuditData] = useState<PaginatedResponse<AuditLogEntry> | null>(null);
   const [auditError, setAuditError] = useState('');
   const [auditLoading, setAuditLoading] = useState(true);
@@ -125,66 +119,17 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
   return (
     <div className="min-h-screen p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
-        <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <NavLink to="/" className="flex items-center gap-3 mb-2">
-              <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900/80 border border-slate-700/60 shadow-lg shadow-cyan-500/10">
-                <img src="/IotMonitoring.png" alt="IoT Monitoring" className="w-12 h-12 object-contain" />
-              </div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-white">{t('common.appName')}</h1>
-            </NavLink>
-            <p className="text-gray-400 text-sm">{t('audit.subtitle')}</p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <nav className="flex items-center gap-1 rounded-full bg-slate-800/70 p-1">
-              <NavLink
-                to="/"
-                className={({ isActive }) =>
-                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
-                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
-                  }`
-                }
-                end
-              >
-                {t('common.dashboard')}
-              </NavLink>
-              <NavLink
-                to="/admin"
-                className={({ isActive }) =>
-                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
-                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
-                  }`
-                }
-              >
-                {t('common.adminDashboard')}
-              </NavLink>
-              <NavLink
-                to="/audit"
-                className={({ isActive }) =>
-                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
-                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
-                  }`
-                }
-              >
-                {t('common.auditLogs')}
-              </NavLink>
-              <NavLink
-                to="/health"
-                className={({ isActive }) =>
-                  `px-3 py-1.5 rounded-full text-sm font-semibold transition ${
-                    isActive ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-gray-200'
-                  }`
-                }
-              >
-                {t('common.systemHealth')}
-              </NavLink>
-            </nav>
-            {user && (
-              <ProfileMenu user={user} onLogout={onLogout} onSettings={() => navigate('/settings')} />
-            )}
-          </div>
-        </header>
+        <AdminPageHeader
+          title={t('common.appName')}
+          subtitle={t('audit.subtitle')}
+          dashboardLabel={t('common.dashboard')}
+          adminLabel={t('common.adminDashboard')}
+          auditLabel={t('common.auditLogs')}
+          healthLabel={t('common.systemHealth')}
+          user={user}
+          onLogout={onLogout}
+          onSettings={() => navigate('/settings')}
+        />
 
         <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
           <div className="p-4 border-b border-slate-700/40">
@@ -316,7 +261,7 @@ export function AuditLogs({ user, onLogout }: AuditLogsProps) {
                       const metadataText = formatAuditMetadata(entry.metadata);
                       return (
                         <tr key={entry.id}>
-                          <td>{new Date(entry.created_at).toLocaleString(locale)}</td>
+                          <td>{formatLocaleDateTime(entry.created_at, locale)}</td>
                           <td title={actorLabel}>{actorLabel}</td>
                           <td>
                             <span className="badge bg-slate-700/60 text-slate-200 border border-slate-600/60">

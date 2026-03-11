@@ -3,8 +3,9 @@ import {
   getErrorCode,
   hashPassword,
   logAudit,
-  normalizeFlag,
+  normalizeUserRow,
   pool,
+  USER_PUBLIC_COLUMNS,
   verifyPassword,
 } from "../common.js";
 
@@ -20,21 +21,16 @@ export const registerAuthRoutes = (app: express.Express) => {
       const result = await pool.query(
         `INSERT INTO users (username, email, password, role)
          VALUES ($1, $2, $3, 'user')
-         RETURNING id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at`,
+         RETURNING ${USER_PUBLIC_COLUMNS}`,
         [username, email, passwordHash]
       );
-      const created = result.rows[0];
-      const response = {
-        ...created,
-        is_admin: normalizeFlag(created.is_admin) ? 1 : 0,
-        must_change_password: normalizeFlag(created.must_change_password),
-      };
+      const response = normalizeUserRow(result.rows[0]);
       await logAudit({
         req,
-        actor: { id: created.id, email: created.email },
+        actor: { id: response.id, email: response.email },
         action: "user.register",
         entityType: "user",
-        entityId: created.id,
+        entityId: response.id,
       });
       return res.status(201).json(response);
     } catch (error) {
@@ -69,15 +65,9 @@ export const registerAuthRoutes = (app: express.Express) => {
       }
 
       const response = {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        is_admin: normalizeFlag(user.is_admin) ? 1 : 0,
+        ...normalizeUserRow(user),
         invited_by: user.invited_by ?? null,
         invited_at: user.invited_at ?? null,
-        must_change_password: normalizeFlag(user.must_change_password),
-        created_at: user.created_at,
       };
       await logAudit({
         req,

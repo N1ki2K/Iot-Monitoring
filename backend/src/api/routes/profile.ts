@@ -4,8 +4,9 @@ import {
   getRequester,
   hashPassword,
   logAudit,
-  normalizeFlag,
+  normalizeUserRow,
   pool,
+  USER_PUBLIC_COLUMNS,
   verifyPassword,
 } from "../common.js";
 
@@ -33,15 +34,10 @@ export const registerProfileRoutes = (app: express.Express) => {
         `UPDATE users
          SET username = $1, email = $2
          WHERE id = $3
-         RETURNING id, username, email, role, is_admin, invited_by, invited_at, must_change_password, created_at`,
+         RETURNING ${USER_PUBLIC_COLUMNS}`,
         [username, email, requester.id]
       );
-      const updated = result.rows[0];
-      const response = {
-        ...updated,
-        is_admin: normalizeFlag(updated.is_admin) ? 1 : 0,
-        must_change_password: normalizeFlag(updated.must_change_password),
-      };
+      const response = normalizeUserRow(result.rows[0]);
       await logAudit({
         req,
         actor: { id: requester.id, email: requester.email },

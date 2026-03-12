@@ -11,22 +11,17 @@ import type {
 } from '../types';
 import { UserInviteModal } from './UserInviteModal';
 import { AdminPageHeader } from './AdminPageHeader';
+import { AdminAssignmentsSection } from './admin/AdminAssignmentsSection';
+import { AdminControllersSection } from './admin/AdminControllersSection';
+import { AdminUsersSection } from './admin/AdminUsersSection';
 import { useI18n } from '../useI18n';
-import { formatLocaleDateTime } from '../utils/format';
-import { isUserAdmin, normalizeFlag } from '../utils/flags';
+import { getApiErrorMessage } from '../utils/apiErrors';
+import { isUserAdmin } from '../utils/flags';
 
 interface AdminDashboardProps {
   user?: AuthUser | null;
   onLogout: () => void;
 }
-
-const getErrorMessage = (error: unknown, fallback: string) => {
-  if (error && typeof error === 'object' && 'response' in error) {
-    const typed = error as { response?: { data?: { error?: string } } };
-    return typed.response?.data?.error ?? fallback;
-  }
-  return fallback;
-};
 
 export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const { t, locale } = useI18n();
@@ -66,7 +61,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
           setSelectedUserId((current) => current || data[0].id);
         }
       } catch (error) {
-        const message = getErrorMessage(error, t('admin.loadUsersFailed'));
+        const message = getApiErrorMessage(error, t('admin.loadUsersFailed'));
         setUsersError(message);
       } finally {
         setIsLoading(false);
@@ -84,7 +79,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         const available = await api.getAvailableDevices();
         setAvailableDevices(available);
       } catch (error) {
-        const message = getErrorMessage(error, t('admin.loadControllersFailed'));
+        const message = getApiErrorMessage(error, t('admin.loadControllersFailed'));
         setControllerError(message);
         setControllers([]);
         setAvailableDevices([]);
@@ -103,7 +98,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         const data = await api.getUserControllers(selectedUserId);
         setAssignments(data);
       } catch (error) {
-        const message = getErrorMessage(error, t('admin.loadAssignmentsFailed'));
+        const message = getApiErrorMessage(error, t('admin.loadAssignmentsFailed'));
         setAssignError(message);
       }
     };
@@ -134,7 +129,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       const data = await api.getUsers();
       setUsers(data);
     } catch (error) {
-      const message = getErrorMessage(error, t('admin.inviteFailed'));
+      const message = getApiErrorMessage(error, t('admin.inviteFailed'));
       setInviteError(message);
     } finally {
       setIsInviting(false);
@@ -149,7 +144,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       await api.deleteUser(userId);
       setUsers((prev) => prev.filter((row) => row.id !== userId));
     } catch (error) {
-      const message = getErrorMessage(error, t('admin.deleteUserFailed'));
+      const message = getApiErrorMessage(error, t('admin.deleteUserFailed'));
       setUsersError(message);
     } finally {
       setIsDeletingUserId(null);
@@ -169,7 +164,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       setAssignments(data);
       setControllerId('');
     } catch (error) {
-      const message = getErrorMessage(error, t('admin.assignFailed'));
+      const message = getApiErrorMessage(error, t('admin.assignFailed'));
       setAssignError(message);
     }
   };
@@ -182,7 +177,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       const data = await api.getUserControllers(selectedUserId);
       setAssignments(data);
     } catch (error) {
-      const message = getErrorMessage(error, t('settings.removeDeviceFailed'));
+      const message = getApiErrorMessage(error, t('settings.removeDeviceFailed'));
       setAssignError(message);
     }
   };
@@ -204,7 +199,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       setNewDeviceId('');
       setNewLabel('');
     } catch (error) {
-      const message = getErrorMessage(error, t('admin.createControllerFailed'));
+      const message = getApiErrorMessage(error, t('admin.createControllerFailed'));
       setControllerError(message);
     }
   };
@@ -219,7 +214,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
         setControllerId('');
       }
     } catch (error) {
-      const message = getErrorMessage(error, t('admin.deleteControllerFailed'));
+      const message = getApiErrorMessage(error, t('admin.deleteControllerFailed'));
       setControllerError(message);
     }
   };
@@ -247,284 +242,87 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
           onSettings={() => navigate('/settings')}
         />
 
-        <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
-          <div className="p-4 border-b border-slate-700/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-200">{t('admin.users')}</h3>
-              <p className="text-sm text-gray-400 mt-1">{t('admin.usersHelp')}</p>
-            </div>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                resetInviteState();
-                setShowInviteModal(true);
-              }}
-            >
-              {t('admin.inviteUser')}
-            </button>
-          </div>
-          {usersError ? (
-            <div className="p-4 text-sm text-red-300">{usersError}</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>{t('common.username')}</th>
-                    <th>{t('common.email')}</th>
-                    <th>{t('common.role')}</th>
-                    <th>{t('admin.invited')}</th>
-                    <th>{t('admin.mustChange')}</th>
-                    <th>{t('common.created')}</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan={7} className="text-center py-8 text-gray-500">
-                        {t('common.loading')}
-                      </td>
-                    </tr>
-                  ) : users.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="text-center py-8 text-gray-500">
-                        {t('admin.noUsers')}
-                      </td>
-                    </tr>
-                  ) : (
-                    users.map((row) => {
-                      const isAdminFlag = normalizeFlag(row.is_admin) || row.role === 'admin';
-                      const roleLabel = isAdminFlag ? t('common.admin') : t('common.user');
-                      return (
-                        <tr key={row.id}>
-                          <td>{row.username}</td>
-                          <td>{row.email}</td>
-                          <td>{roleLabel}</td>
-                          <td>{formatLocaleDateTime(row.invited_at, locale)}</td>
-                          <td>{normalizeFlag(row.must_change_password) ? t('common.yes') : t('common.no')}</td>
-                          <td>{formatLocaleDateTime(row.created_at, locale)}</td>
-                          <td className="text-right">
-                            {row.id === user?.id ? (
-                              <span className="text-xs text-gray-500">{t('admin.you')}</span>
-                            ) : (
-                              <button
-                                type="button"
-                                className="btn btn-ghost text-red-300"
-                                onClick={() => handleDeleteUser(row.id)}
-                                disabled={isDeletingUserId === row.id}
-                              >
-                                {isDeletingUserId === row.id ? t('admin.deleting') : t('common.delete')}
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        <AdminUsersSection
+          currentUser={user}
+          users={users}
+          isLoading={isLoading}
+          error={usersError}
+          locale={locale}
+          usersTitle={t('admin.users')}
+          usersHelp={t('admin.usersHelp')}
+          inviteLabel={t('admin.inviteUser')}
+          usernameLabel={t('common.username')}
+          emailLabel={t('common.email')}
+          roleLabel={t('common.role')}
+          invitedLabel={t('admin.invited')}
+          mustChangeLabel={t('admin.mustChange')}
+          createdLabel={t('common.created')}
+          loadingLabel={t('common.loading')}
+          noUsersLabel={t('admin.noUsers')}
+          yesLabel={t('common.yes')}
+          noLabel={t('common.no')}
+          userLabel={t('common.user')}
+          adminLabel={t('common.admin')}
+          youLabel={t('admin.you')}
+          deleteLabel={t('common.delete')}
+          deletingLabel={t('admin.deleting')}
+          onInvite={() => {
+            resetInviteState();
+            setShowInviteModal(true);
+          }}
+          onDelete={handleDeleteUser}
+          deletingUserId={isDeletingUserId}
+        />
 
-        <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
-          <div className="p-4 border-b border-slate-700/40">
-            <h3 className="text-lg font-semibold text-gray-200">{t('admin.controllerAssignments')}</h3>
-            <p className="text-sm text-gray-400 mt-1">{t('admin.controllerAssignmentsHelp')}</p>
-          </div>
-          <div className="p-4 space-y-4">
-            <form className="grid gap-4 md:grid-cols-3" onSubmit={handleAssign}>
-              <div>
-                <label className="text-sm text-gray-300">{t('common.user')}</label>
-                <select
-                  className="select w-full mt-2"
-                  value={selectedUserId}
-                  onChange={(event) =>
-                    setSelectedUserId(event.target.value ? Number(event.target.value) : '')
-                  }
-                >
-                  <option value="">{t('admin.selectUser')}</option>
-                  {users.map((row) => (
-                    <option key={row.id} value={row.id}>
-                      {row.username} ({row.email})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm text-gray-300">{t('admin.controllers')}</label>
-                <select
-                  className="select w-full mt-2"
-                  value={controllerId}
-                  onChange={(event) =>
-                    setControllerId(event.target.value ? Number(event.target.value) : '')
-                  }
-                >
-                  <option value="">{t('admin.selectController')}</option>
-                  {controllers.map((controller) => (
-                    <option key={controller.id} value={controller.id}>
-                      {controller.label ? `${controller.label} • ` : ''}
-                      {controller.device_id}
-                      {controller.pairing_code ? ` • ${controller.pairing_code}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-end">
-                <button className="btn btn-primary w-full" type="submit">
-                  {t('admin.assign')}
-                </button>
-              </div>
-            </form>
+        <AdminAssignmentsSection
+          users={users}
+          controllers={controllers}
+          assignments={assignments}
+          selectedUserId={selectedUserId}
+          controllerId={controllerId}
+          locale={locale}
+          error={assignError}
+          title={t('admin.controllerAssignments')}
+          help={t('admin.controllerAssignmentsHelp')}
+          userLabel={t('common.user')}
+          controllerLabel={t('admin.controllers')}
+          assignLabel={t('admin.assign')}
+          selectUserLabel={t('admin.selectUser')}
+          selectControllerLabel={t('admin.selectController')}
+          controllerIdLabel={t('admin.controllerId')}
+          assignedLabel={t('settings.assigned')}
+          codeLabel={t('admin.code')}
+          selectUserForAssignmentsLabel={t('admin.selectUserForAssignments')}
+          noAssignmentsLabel={t('admin.noAssignments')}
+          removeLabel={t('common.remove')}
+          onSelectUser={setSelectedUserId}
+          onSelectController={setControllerId}
+          onAssign={handleAssign}
+          onRemove={handleRemove}
+        />
 
-            {assignError && (
-              <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
-                {assignError}
-              </div>
-            )}
-
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>{t('admin.controllerId')}</th>
-                    <th>{t('settings.assigned')}</th>
-                    <th>{t('admin.code')}</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedUserId === '' ? (
-                    <tr>
-                      <td colSpan={4} className="text-center py-8 text-gray-500">
-                        {t('admin.selectUserForAssignments')}
-                      </td>
-                    </tr>
-                  ) : assignments.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="text-center py-8 text-gray-500">
-                        {t('admin.noAssignments')}
-                      </td>
-                    </tr>
-                  ) : (
-                    assignments.map((assignment) => (
-                      <tr key={`${assignment.user_id}-${assignment.controller_id}`}>
-                        <td>
-                          {assignment.assignment_label
-                            ? `${assignment.assignment_label} • `
-                            : assignment.controller_label
-                              ? `${assignment.controller_label} • `
-                              : ''}
-                          {assignment.device_id}
-                        </td>
-                        <td>{formatLocaleDateTime(assignment.created_at, locale)}</td>
-                        <td>{assignment.pairing_code || '-'}</td>
-                        <td className="text-right">
-                          <button
-                            type="button"
-                            className="btn btn-ghost text-red-300"
-                            onClick={() => handleRemove(assignment.controller_id)}
-                          >
-                            {t('common.remove')}
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-slate-800/40 rounded-xl border border-slate-700/40 overflow-hidden">
-          <div className="p-4 border-b border-slate-700/40">
-            <h3 className="text-lg font-semibold text-gray-200">{t('admin.controllers')}</h3>
-            <p className="text-sm text-gray-400 mt-1">{t('admin.controllersHelp')}</p>
-          </div>
-          <div className="p-4 space-y-4">
-            <form className="grid gap-4 md:grid-cols-3" onSubmit={handleCreateController}>
-              <div>
-                <label className="text-sm text-gray-300">{t('admin.deviceId')}</label>
-                <input
-                  className="input mt-2"
-                  list="available-devices"
-                  placeholder="device_id"
-                  value={newDeviceId}
-                  onChange={(event) => setNewDeviceId(event.target.value)}
-                />
-                <datalist id="available-devices">
-                  {availableDevices.map((device) => (
-                    <option key={device} value={device} />
-                  ))}
-                </datalist>
-              </div>
-              <div>
-                <label className="text-sm text-gray-300">{t('admin.labelOptional')}</label>
-                <input
-                  className="input mt-2"
-                  placeholder="Lab Sensor 01"
-                  value={newLabel}
-                  onChange={(event) => setNewLabel(event.target.value)}
-                />
-              </div>
-              <div className="flex items-end">
-                <button className="btn btn-secondary w-full" type="submit">
-                  {t('admin.addController')}
-                </button>
-              </div>
-            </form>
-
-            {controllerError && (
-              <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
-                {controllerError}
-              </div>
-            )}
-
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>{t('admin.deviceId')}</th>
-                    <th>{t('common.label')}</th>
-                    <th>{t('admin.code')}</th>
-                    <th>{t('common.created')}</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {controllers.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="text-center py-8 text-gray-500">
-                        {t('admin.noControllersCreated')}
-                      </td>
-                    </tr>
-                  ) : (
-                    controllers.map((controller) => (
-                      <tr key={controller.id}>
-                        <td>{controller.device_id}</td>
-                        <td>{controller.label || '-'}</td>
-                        <td>{controller.pairing_code || '-'}</td>
-                        <td>{formatLocaleDateTime(controller.created_at, locale)}</td>
-                        <td className="text-right">
-                          <button
-                            type="button"
-                            className="btn btn-ghost text-red-300"
-                            onClick={() => handleDeleteController(controller.id)}
-                          >
-                            {t('common.delete')}
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
+        <AdminControllersSection
+          controllers={controllers}
+          availableDevices={availableDevices}
+          deviceId={newDeviceId}
+          label={newLabel}
+          locale={locale}
+          error={controllerError}
+          title={t('admin.controllers')}
+          help={t('admin.controllersHelp')}
+          deviceIdLabel={t('admin.deviceId')}
+          labelOptionalLabel={t('admin.labelOptional')}
+          codeLabel={t('admin.code')}
+          createdLabel={t('common.created')}
+          addControllerLabel={t('admin.addController')}
+          noControllersLabel={t('admin.noControllersCreated')}
+          deleteLabel={t('common.delete')}
+          commonLabel={t('common.label')}
+          onDeviceIdChange={setNewDeviceId}
+          onLabelChange={setNewLabel}
+          onSubmit={handleCreateController}
+          onDelete={handleDeleteController}
+        />
 
         <UserInviteModal
           isOpen={showInviteModal}

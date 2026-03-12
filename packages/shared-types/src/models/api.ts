@@ -1,6 +1,4 @@
-/**
- * Common API type definitions
- */
+
 
 /**
  * Paginated response wrapper

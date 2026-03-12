@@ -129,11 +129,6 @@ Subscribes to MQTT and writes sensor data to PostgreSQL.
 npm run ingest
 ```
 
-**Wokwi Web (HiveMQ broker):**
-```bash
-MQTT_URL=mqtt://broker.hivemq.com:1883 npm run ingest
-```
-
 Expected output:
 ```
 MQTT connected

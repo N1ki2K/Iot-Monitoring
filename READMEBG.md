@@ -5,7 +5,7 @@
 ## Архитектура
 
 ```
-ESP32 (Wokwi) → MQTT Брокер → Backend Обработка → PostgreSQL → Backend API → React Frontend
+ESP32 → MQTT Брокер → Backend Обработка → PostgreSQL → Backend API → React Frontend
 ```
 
 ## Файлова Структура
@@ -45,11 +45,6 @@ Iot-Monitoring/
 │   ├── postcss.config.js
 │   ├── tsconfig.json
 │   └── README.md
-│
-├── device/                       # ESP32 фърмуер
-│   └── wokwi/
-│       ├── sketch.ino           # Arduino код за сензори
-│       └── diagram.json         # Wokwi схема на веригата
 │
 ├── infra/                        # Инфраструктурни конфигурации
 │   ├── mosquitto/               # MQTT брокер конфигурация
@@ -285,30 +280,6 @@ npm run dev
 ```
 
 Отворете `http://localhost:5173`
-
-### 6. Стартиране на Wokwi Симулация
-
-Стартирайте ESP32 симулацията на [wokwi.com](https://wokwi.com) или локално.
-
-Обновете `device/wokwi/config.h` да съответства на вашия брокер:
-- За локален Mosquitto: задайте `MQTT_HOST` към IP адреса на вашата машина в локалната мрежа.
-
-Уверете се, че `MQTT_TOPIC` в `config.h` съответства на `MQTT_TOPIC` в `.env`.
-
-#### (По избор) Локално Компилиране на Wokwi Фърмуер
-
-Репозиторито вече съдържа предварително компилиран фърмуер в `device/wokwi/build/`. Ако искате да го прекомпилирате:
-
-```bash
-# Инсталиране на ESP32 ядро
-arduino-cli core install esp32:esp32
-
-# Инсталиране на необходимите библиотеки
-arduino-cli lib install "DHT sensor library" "Adafruit Unified Sensor" "PubSubClient"
-
-# Компилиране на скеча в device/wokwi/build
-arduino-cli compile --fqbn esp32:esp32:esp32 device/wokwi --output-dir device/wokwi/build
-```
 
 ## Сензори
 

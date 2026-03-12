@@ -14,7 +14,7 @@ A multi-client IoT platform that collects environmental telemetry from ESP32-bas
 
 ### Short academic-style abstract
 
-The project implements an Internet of Things monitoring system for collecting, storing, and visualizing environmental sensor data. An ESP32 controller reads temperature, humidity, light, sound, and air-quality-related values and publishes telemetry to an MQTT broker. A backend ingestion service subscribes to the telemetry topic, validates and stores incoming data in PostgreSQL, and a REST API exposes user, device, reading, audit, and health-management functionality. A React web dashboard and an Android client provide monitoring, device claiming, administration, and historical analysis features. The system follows a modular monorepo structure and uses shared TypeScript models to keep the backend and frontend synchronized.
+The project implements an Internet of Things monitoring system for collecting, storing, and visualizing environmental sensor data. An ESP32 controller reads temperature, humidity, light, sound, and air-quality-related values and publishes telemetry to an MQTT broker. A backend ingestion service subscribes to the telemetry topic, validates and stores incoming data in PostgreSQL, and a REST API exposes user, device, reading, audit, and health-management functionality. A React web application and an Android client provide monitoring, device claiming, administration, audit inspection, and historical analysis features. The system follows a modular monorepo structure and uses shared TypeScript models to keep the backend and frontend synchronized.
 
 ## 2. Problem Statement
 
@@ -65,7 +65,7 @@ This separation improves maintainability and allows each layer to evolve indepen
 The repository is a monorepo with the following major areas:
 
 - `backend/`: Express API, MQTT ingest worker, SQL migrations, backend tests
-- `frontend/`: React + Vite web dashboard
+- `frontend/`: React + Vite web client with dashboard, admin, audit, and health views
 - `packages/shared-types/`: shared TypeScript interfaces used by frontend and backend
 - `infra/`: Docker Compose configuration for PostgreSQL, Mosquitto, and Adminer
 - `device/`: ESP32 firmware and device configuration
@@ -125,6 +125,11 @@ Iot-Monitoring/
 │       ├── main.tsx
 │       ├── api/
 │       ├── components/
+│       │   ├── admin/
+│       │   └── dashboard/
+│       ├── i18n/
+│       │   ├── en.ts
+│       │   └── bg.ts
 │       ├── utils/
 │       └── types/
 ├── packages/
@@ -146,14 +151,14 @@ Iot-Monitoring/
 │       └── init/
 │           └── init.ino
 ├── mobile/
-   ├── build.gradle.kts
-   ├── settings.gradle.kts
-   ├── gradlew
-   └── app/
-       ├── build.gradle.kts
-       └── src/main/
-           ├── AndroidManifest.xml
-           ├── java/
+│   ├── build.gradle.kts
+│   ├── settings.gradle.kts
+│   ├── gradlew
+│   └── app/
+│       ├── build.gradle.kts
+│       └── src/main/
+│           ├── AndroidManifest.xml
+│           └── java/
 
 ```
 
@@ -162,7 +167,7 @@ Iot-Monitoring/
 This structure separates responsibilities clearly:
 
 - `backend/` contains server-side logic and persistence behavior
-- `frontend/` contains the browser client
+- `frontend/` contains the browser client, including monitoring, administration, audit, and health screens
 - `mobile/` contains the Android client
 - `device/` contains embedded firmware
 - `infra/` contains local deployment infrastructure
@@ -170,7 +175,21 @@ This structure separates responsibilities clearly:
 
 This layout is appropriate for a full-stack IoT project because each subsystem has a clear place in the repository while still remaining part of one coordinated codebase.
 
-### 5.3 ESP32 firmware structure
+### 5.3 Frontend structure notes
+
+The current frontend has been refactored into a mix of page-level containers and smaller extracted UI sections. Important structure points include:
+
+- `frontend/src/components/Dashboard.tsx`: dashboard container for device loading, live refresh, and claim flow
+- `frontend/src/components/dashboard/`: extracted dashboard sections such as header, status bar, charts, sensor grid, and claim modal
+- `frontend/src/components/AdminDashboard.tsx`: admin container for users, controllers, and assignments
+- `frontend/src/components/admin/`: extracted admin sections for users, controller assignments, and controllers
+- `frontend/src/components/AuditLogs.tsx`: audit log page for filtering, paging, and purge operations
+- `frontend/src/components/SystemHealth.tsx`: administrator health and usage metrics view
+- `frontend/src/i18n/en.ts` and `frontend/src/i18n/bg.ts`: separate language dictionaries used by the i18n provider
+
+This organization is useful because it keeps route-level state and API coordination inside the page containers while moving repeated visual sections into smaller components that are easier to test and maintain.
+
+### 5.4 ESP32 firmware structure
 
 The real ESP32 project structure currently present in the repository is:
 
@@ -181,7 +200,7 @@ device/
         └── init.ino
 ```
 
-### 5.4 ESP32 structure explanation
+### 5.5 ESP32 structure explanation
 
 The ESP32 side is currently compact and centered around a single firmware entry file:
 
@@ -232,12 +251,13 @@ Why these backend technologies were used:
 
 Why these frontend technologies were used:
 
-- React is appropriate for a dashboard-style application with reusable UI components and state-driven rendering.
+- React is appropriate for a dashboard-style application with reusable UI components and state-driven rendering across monitoring, administration, audit, and health pages.
 - TypeScript improves reliability in API consumption and component interfaces.
 - Vite provides fast startup and straightforward frontend tooling, which is useful in a multi-package repository.
-- Tailwind CSS allows rapid construction of dashboard layouts without a large custom CSS architecture.
+- Tailwind CSS allows rapid construction of dashboard and admin layouts without a large custom CSS architecture.
 - Recharts is suitable for telemetry visualization because the project needs line and data-driven charts rather than highly specialized graphics.
 - Axios provides a simple and familiar HTTP client abstraction for REST calls.
+- File-based language dictionaries keep localization content easier to maintain as the interface grows.
 
 ### Mobile
 

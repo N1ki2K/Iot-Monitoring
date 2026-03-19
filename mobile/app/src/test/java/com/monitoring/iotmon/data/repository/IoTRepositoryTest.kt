@@ -21,6 +21,7 @@ import com.monitoring.iotmon.data.models.LoginRequest
 import com.monitoring.iotmon.data.models.PaginatedResponse
 import com.monitoring.iotmon.data.models.Pagination
 import com.monitoring.iotmon.data.models.Reading
+import com.monitoring.iotmon.data.models.RefreshTokenRequest
 import com.monitoring.iotmon.data.models.RegisterRequest
 import com.monitoring.iotmon.data.models.RemoveControllerRequest
 import com.monitoring.iotmon.data.models.UpdateAssignmentRequest
@@ -133,6 +134,8 @@ private fun sampleHealthStats() = HealthStats(
 private class FakeApiService : ApiService {
     var loginResponse: Response<AuthUser> = Response.error(500, errorBody("Login failed"))
     var registerResponse: Response<AuthUser> = Response.error(500, errorBody("Register failed"))
+    var refreshResponse: Response<AuthUser> = Response.error(500, errorBody("Refresh failed"))
+    var logoutResponse: Response<Unit> = Response.error(500, errorBody("Logout failed"))
     var meResponse: Response<AuthUser> = Response.error(500, errorBody("Profile failed"))
     var updateProfileResponse: Response<AuthUser> = Response.error(500, errorBody("Update failed"))
     var changePasswordResponse: Response<Unit> = Response.error(500, errorBody("Password failed"))
@@ -162,6 +165,8 @@ private class FakeApiService : ApiService {
 
     override suspend fun login(request: LoginRequest): Response<AuthUser> = loginResponse
     override suspend fun register(request: RegisterRequest): Response<AuthUser> = registerResponse
+    override suspend fun refresh(request: RefreshTokenRequest): Response<AuthUser> = refreshResponse
+    override suspend fun logout(request: RefreshTokenRequest): Response<Unit> = logoutResponse
     override suspend fun getMe(): Response<AuthUser> = meResponse
     override suspend fun updateProfile(request: UpdateProfileRequest): Response<AuthUser> = updateProfileResponse
     override suspend fun changePassword(request: ChangePasswordRequest): Response<Unit> = changePasswordResponse
@@ -526,7 +531,7 @@ class IoTRepositoryTest {
     }
 
     @Test
-    fun setUserIdAndLogoutControlApiClient() {
+    fun setUserIdAndLogoutControlApiClient() = runTest {
         repository.setUserId(99)
         assertEquals(99, ApiClient.getUserId())
 

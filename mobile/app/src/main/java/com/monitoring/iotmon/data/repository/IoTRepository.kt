@@ -14,7 +14,10 @@ sealed class Result<out T> {
 class IoTRepository(private val api: ApiService = ApiClient.apiService) {
 
     private fun withCurrentToken(user: AuthUser): AuthUser =
-        if (user.token != null) user else user.copy(token = ApiClient.getAuthToken())
+        user.copy(
+            token = user.token ?: ApiClient.getAuthToken(),
+            refreshToken = user.refreshToken ?: ApiClient.getRefreshToken()
+        )
 
     // Authentication
     suspend fun login(email: String, password: String): Result<AuthUser> = withContext(Dispatchers.IO) {
@@ -24,6 +27,7 @@ class IoTRepository(private val api: ApiService = ApiClient.apiService) {
                 val user = response.body()!!
                 ApiClient.setUserId(user.id)
                 ApiClient.setAuthToken(user.token)
+                ApiClient.setRefreshToken(user.refreshToken)
                 Result.Success(user)
             } else {
                 val errorBody = response.errorBody()?.string()
@@ -41,6 +45,7 @@ class IoTRepository(private val api: ApiService = ApiClient.apiService) {
                 val user = response.body()!!
                 ApiClient.setUserId(user.id)
                 ApiClient.setAuthToken(user.token)
+                ApiClient.setRefreshToken(user.refreshToken)
                 Result.Success(user)
             } else {
                 val errorBody = response.errorBody()?.string()
@@ -424,8 +429,16 @@ class IoTRepository(private val api: ApiService = ApiClient.apiService) {
         ApiClient.setUserId(userId)
     }
 
-    fun logout() {
+    suspend fun logout() = withContext(Dispatchers.IO) {
+        ApiClient.getRefreshToken()?.let { refreshToken ->
+            try {
+                api.logout(RefreshTokenRequest(refreshToken))
+            } catch (_: Exception) {
+                // Ignore logout transport failures and clear local session.
+            }
+        }
         ApiClient.setUserId(null)
         ApiClient.setAuthToken(null)
+        ApiClient.setRefreshToken(null)
     }
 }

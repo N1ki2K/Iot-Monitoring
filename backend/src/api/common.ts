@@ -46,6 +46,18 @@ type AccessTokenPayload = JWTPayload & {
   is_admin: number;
 };
 
+type AuthUserLike = {
+  id: number;
+  email: string;
+  username: string;
+  role?: string;
+  is_admin: unknown;
+  invited_by?: number | null;
+  invited_at?: string | null;
+  must_change_password: unknown;
+  created_at: string;
+};
+
 export const getJwtSecret = () => {
   const secret = process.env.JWT_SECRET?.trim();
   if (!secret) {
@@ -57,6 +69,11 @@ export const getJwtSecret = () => {
 const getJwtExpirySeconds = () => {
   const parsed = Number(process.env.JWT_EXPIRES_IN_SECONDS ?? 3600);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 3600;
+};
+
+const getRefreshExpirySeconds = () => {
+  const parsed = Number(process.env.JWT_REFRESH_EXPIRES_IN_SECONDS ?? 1209600);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1209600;
 };
 
 const getJwtSecretBytes = () => new TextEncoder().encode(getJwtSecret());
@@ -155,6 +172,76 @@ export const createAccessToken = async (user: {
     .sign(getJwtSecretBytes());
 };
 
+export const generateRefreshToken = () => crypto.randomBytes(48).toString("base64url");
+
+export const hashRefreshToken = (token: string) =>
+  crypto.createHash("sha256").update(token).digest("hex");
+
+export const createRefreshTokenSession = async (userId: number) => {
+  const refreshToken = generateRefreshToken();
+  const tokenHash = hashRefreshToken(refreshToken);
+  const expiresAt = new Date(Date.now() + getRefreshExpirySeconds() * 1000);
+
+  await pool.query(
+    `INSERT INTO refresh_tokens (token_hash, user_id, expires_at)
+     VALUES ($1, $2, $3)`,
+    [tokenHash, userId, expiresAt]
+  );
+
+  return { refreshToken, expiresAt };
+};
+
+export const revokeRefreshToken = async (refreshToken: string) => {
+  const tokenHash = hashRefreshToken(refreshToken);
+  await pool.query(
+    `UPDATE refresh_tokens
+     SET revoked_at = NOW()
+     WHERE token_hash = $1 AND revoked_at IS NULL`,
+    [tokenHash]
+  );
+};
+
+export const getUserByRefreshToken = async (refreshToken: string) => {
+  const tokenHash = hashRefreshToken(refreshToken);
+  const result = await pool.query(
+    `SELECT
+       u.${USER_PUBLIC_COLUMNS},
+       rt.token_hash,
+       rt.expires_at,
+       rt.revoked_at
+     FROM refresh_tokens rt
+     JOIN users u ON u.id = rt.user_id
+     WHERE rt.token_hash = $1`,
+    [tokenHash]
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  if (row.revoked_at) return null;
+  if (new Date(row.expires_at).getTime() <= Date.now()) return null;
+  return {
+    user: normalizeUserRow(row),
+    tokenHash,
+  };
+};
+
+export const rotateRefreshToken = async (refreshToken: string) => {
+  const session = await getUserByRefreshToken(refreshToken);
+  if (!session) return null;
+
+  await pool.query(
+    `UPDATE refresh_tokens
+     SET revoked_at = NOW()
+     WHERE token_hash = $1 AND revoked_at IS NULL`,
+    [session.tokenHash]
+  );
+
+  const nextSession = await createRefreshTokenSession(session.user.id);
+  return {
+    user: session.user,
+    refreshToken: nextSession.refreshToken,
+  };
+};
+
 export const verifyAccessToken = async (token: string): Promise<AccessTokenPayload> => {
   const { payload, protectedHeader } = await jwtVerify(token, getJwtSecretBytes(), {
     algorithms: ["HS256"],
@@ -172,19 +259,6 @@ export const verifyAccessToken = async (token: string): Promise<AccessTokenPaylo
 };
 
 const resolveAuthContext = async (req: express.Request): Promise<RequestAuthContext> => {
-  if (process.env.NODE_ENV === "test") {
-    const fallbackId = Number(req.header("x-user-id"));
-    if (fallbackId) {
-      return {
-        tokenPayload: {
-          sub: String(fallbackId),
-          email: "",
-          is_admin: 0,
-        },
-      };
-    }
-  }
-
   const authHeader = req.header("authorization");
   const tokenMatch = authHeader?.match(/^Bearer\s+(.+)$/i);
   if (!authHeader) {
@@ -261,6 +335,23 @@ export const requireAdminRequester = async (req: express.Request, res: express.R
     return null;
   }
   return requester;
+};
+
+export const buildAuthResponse = async (user: AuthUserLike) => {
+  const normalizedUser = normalizeUserRow(user);
+  const safeUser = { ...normalizedUser } as typeof normalizedUser & {
+    password?: string;
+  };
+  delete safeUser.password;
+
+  const { refreshToken } = await createRefreshTokenSession(normalizedUser.id);
+  return {
+    ...safeUser,
+    invited_by: user.invited_by ?? null,
+    invited_at: user.invited_at ?? null,
+    token: await createAccessToken(normalizedUser),
+    refreshToken,
+  };
 };
 
 export const generatePairingCode = async () => {

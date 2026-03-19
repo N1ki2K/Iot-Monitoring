@@ -181,6 +181,7 @@ PORT=3000
 CORS_ORIGINS=http://localhost:5173
 JWT_SECRET=replace-this-with-a-long-random-secret
 JWT_EXPIRES_IN_SECONDS=3600
+JWT_REFRESH_EXPIRES_IN_SECONDS=1209600
 
 # Frontend
 VITE_API_URL=http://localhost:3000/api
@@ -194,6 +195,7 @@ Notes:
 - `MOBILE_API_URL` must point to your machine's LAN IP for a physical device or emulator setup that cannot use browser localhost.
 - `JWT_SECRET` should be a long random secret and must be set in the root `.env` for backend bearer-token auth.
 - `JWT_EXPIRES_IN_SECONDS` controls access-token lifetime in seconds.
+- `JWT_REFRESH_EXPIRES_IN_SECONDS` controls refresh-token lifetime in seconds.
 - The backend now fails startup if `JWT_SECRET` is missing.
 - `infra/.env.example` contains Compose-specific database defaults for the infrastructure stack.
 
@@ -378,6 +380,8 @@ Representative endpoints exposed by `backend/src/api.ts`:
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
 - `GET /api/me`
 - `PATCH /api/me`
 - `PATCH /api/me/password`
@@ -390,9 +394,12 @@ Representative endpoints exposed by `backend/src/api.ts`:
 
 Auth behavior:
 
-- `POST /api/auth/register` and `POST /api/auth/login` return the authenticated user plus a JWT access token.
+- `POST /api/auth/register` and `POST /api/auth/login` return the authenticated user plus a short-lived JWT access token and an opaque refresh token.
+- `POST /api/auth/refresh` rotates the refresh token and returns a new access token.
+- `POST /api/auth/logout` revokes the submitted refresh token.
 - Protected backend routes expect `Authorization: Bearer <token>`.
-- The backend signs and verifies bearer tokens using `JWT_SECRET` from the root `.env`.
+- The backend signs and verifies access tokens using `JWT_SECRET` from the root `.env`.
+- Refresh tokens are stored hashed in PostgreSQL and can be revoked on logout.
 
 ### Controllers and assignments
 

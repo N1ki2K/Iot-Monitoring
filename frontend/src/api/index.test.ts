@@ -7,6 +7,12 @@ const { getMock, postMock, patchMock, deleteMock, createMock, getInterceptor } =
   const patchMock = vi.fn();
   const deleteMock = vi.fn();
   let requestInterceptor: ((config: AxiosRequestConfig) => AxiosRequestConfig) | undefined;
+  let responseSuccessInterceptor:
+    | ((value: unknown) => unknown)
+    | undefined;
+  let responseErrorInterceptor:
+    | ((error: unknown) => Promise<unknown>)
+    | undefined;
 
   const createMock = vi.fn(() => ({
     get: getMock,
@@ -20,6 +26,16 @@ const { getMock, postMock, patchMock, deleteMock, createMock, getInterceptor } =
           return 0;
         },
       },
+      response: {
+        use: (
+          onFulfilled?: (value: unknown) => unknown,
+          onRejected?: (error: unknown) => Promise<unknown>
+        ) => {
+          responseSuccessInterceptor = onFulfilled;
+          responseErrorInterceptor = onRejected;
+          return 0;
+        },
+      },
     },
   }));
 
@@ -30,6 +46,10 @@ const { getMock, postMock, patchMock, deleteMock, createMock, getInterceptor } =
     deleteMock,
     createMock,
     getInterceptor: () => requestInterceptor,
+    getResponseInterceptors: () => ({
+      onFulfilled: responseSuccessInterceptor,
+      onRejected: responseErrorInterceptor,
+    }),
   };
 });
 

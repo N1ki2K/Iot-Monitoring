@@ -37,6 +37,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 if (user != null) {
                     ApiClient.setUserId(user.id)
                     ApiClient.setAuthToken(user.token)
+                    ApiClient.setRefreshToken(user.refreshToken)
                     _state.value = _state.value.copy(
                         user = user,
                         isLoggedIn = true
@@ -161,9 +162,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun updateUser(user: AuthUser) {
         viewModelScope.launch {
             val mergedUser = if (user.token != null) user else user.copy(token = _state.value.user?.token)
-            preferences.updateUser(mergedUser)
-            ApiClient.setAuthToken(mergedUser.token)
-            _state.value = _state.value.copy(user = mergedUser)
+            val mergedWithRefresh = if (mergedUser.refreshToken != null) mergedUser else mergedUser.copy(refreshToken = _state.value.user?.refreshToken)
+            preferences.updateUser(mergedWithRefresh)
+            ApiClient.setAuthToken(mergedWithRefresh.token)
+            ApiClient.setRefreshToken(mergedWithRefresh.refreshToken)
+            _state.value = _state.value.copy(user = mergedWithRefresh)
         }
     }
 

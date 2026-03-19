@@ -14,6 +14,7 @@ object ApiClient {
 
     private var userId: Int? = null
     private var authToken: String? = null
+    private var refreshToken: String? = null
 
     fun setUserId(id: Int?) {
         userId = id
@@ -26,6 +27,12 @@ object ApiClient {
     }
 
     fun getAuthToken(): String? = authToken
+
+    fun setRefreshToken(token: String?) {
+        refreshToken = token
+    }
+
+    fun getRefreshToken(): String? = refreshToken
 
     private val authInterceptor = Interceptor { chain ->
         val originalRequest = chain.request()

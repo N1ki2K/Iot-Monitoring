@@ -15,6 +15,7 @@ const isAdminRole = (user: AuthUser) => {
 const mergeAuthUser = (nextUser: AuthUser, currentUser: AuthUser | null) => ({
   ...nextUser,
   token: nextUser.token ?? currentUser?.token,
+  refreshToken: nextUser.refreshToken ?? currentUser?.refreshToken,
 });
 
 function App() {
@@ -57,7 +58,15 @@ function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const currentRefreshToken = user?.refreshToken;
+    if (currentRefreshToken) {
+      try {
+        await api.logout(currentRefreshToken);
+      } catch (error) {
+        console.warn('Failed to revoke refresh token:', error);
+      }
+    }
     localStorage.removeItem('authUser');
     setUser(null);
   };

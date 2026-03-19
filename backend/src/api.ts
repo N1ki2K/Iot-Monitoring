@@ -5,6 +5,7 @@ import express from "express";
 import cors from "cors";
 import {
   createAccessToken,
+  authContextMiddleware,
   ensureAdmin,
   extractPairingCode,
   generatePairingCode,
@@ -44,6 +45,7 @@ app.use(
 );
 app.use(express.json());
 app.use(requestMetricsMiddleware);
+app.use(authContextMiddleware);
 
 app.get("/api/health", (_req, res) => {
   return res.status(200).json({ ok: true });
@@ -59,6 +61,7 @@ registerReadingRoutes(app);
 export {
   getRequester,
   createAccessToken,
+  authContextMiddleware,
   ensureAdmin,
   getJwtSecret,
   normalizeFlag,

@@ -28,7 +28,7 @@ export const registerAuthRoutes = (app: express.Express) => {
       const response = normalizeUserRow(result.rows[0]);
       const authResponse = {
         ...response,
-        token: createAccessToken(response),
+        token: await createAccessToken(response),
       };
       await logAudit({
         req,
@@ -77,7 +77,7 @@ export const registerAuthRoutes = (app: express.Express) => {
         ...safeUser,
         invited_by: user.invited_by ?? null,
         invited_at: user.invited_at ?? null,
-        token: createAccessToken(normalizedUser),
+        token: await createAccessToken(normalizedUser),
       };
       await logAudit({
         req,

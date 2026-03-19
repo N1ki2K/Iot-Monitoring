@@ -1,30 +1,26 @@
 import type express from "express";
 import {
   getErrorCode,
-  getRequester,
   hashPassword,
   logAudit,
   normalizeUserRow,
   pool,
+  requireRequester,
   USER_PUBLIC_COLUMNS,
   verifyPassword,
 } from "../common.js";
 
 export const registerProfileRoutes = (app: express.Express) => {
   app.get("/api/me", async (req, res) => {
-    const requester = await getRequester(req);
-    if (!requester) {
-      return res.status(401).json({ error: "missing user id" });
-    }
+    const requester = await requireRequester(req, res);
+    if (!requester) return;
     return res.json(requester);
   });
 
   app.patch("/api/me", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireRequester(req, res);
     const { username, email } = req.body ?? {};
-    if (!requester) {
-      return res.status(401).json({ error: "missing user id" });
-    }
+    if (!requester) return;
     if (!username || !email) {
       return res.status(400).json({ error: "username and email are required" });
     }
@@ -57,11 +53,9 @@ export const registerProfileRoutes = (app: express.Express) => {
   });
 
   app.patch("/api/me/password", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireRequester(req, res);
     const { currentPassword, newPassword } = req.body ?? {};
-    if (!requester) {
-      return res.status(401).json({ error: "missing user id" });
-    }
+    if (!requester) return;
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: "currentPassword and newPassword are required" });
     }
@@ -98,10 +92,8 @@ export const registerProfileRoutes = (app: express.Express) => {
   });
 
   app.delete("/api/me", async (req, res) => {
-    const requester = await getRequester(req);
-    if (!requester) {
-      return res.status(401).json({ error: "missing user id" });
-    }
+    const requester = await requireRequester(req, res);
+    if (!requester) return;
 
     try {
       await pool.query(`DELETE FROM users WHERE id = $1`, [requester.id]);

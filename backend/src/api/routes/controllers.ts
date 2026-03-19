@@ -3,17 +3,16 @@ import {
   ensureAdmin,
   extractPairingCode,
   generatePairingCode,
-  getRequester,
   logAudit,
   pool,
+  requireAdminRequester,
+  requireRequester,
 } from "../common.js";
 
 export const registerControllerRoutes = (app: express.Express) => {
   app.get("/api/controllers", async (req, res) => {
-    const requester = await getRequester(req);
-    if (!requester || !ensureAdmin(requester)) {
-      return res.status(403).json({ error: "admin access required" });
-    }
+    const requester = await requireAdminRequester(req, res);
+    if (!requester) return;
 
     try {
       const result = await pool.query(
@@ -29,10 +28,8 @@ export const registerControllerRoutes = (app: express.Express) => {
   });
 
   app.get("/api/controllers/available-devices", async (req, res) => {
-    const requester = await getRequester(req);
-    if (!requester || !ensureAdmin(requester)) {
-      return res.status(403).json({ error: "admin access required" });
-    }
+    const requester = await requireAdminRequester(req, res);
+    if (!requester) return;
 
     try {
       const result = await pool.query(
@@ -46,11 +43,9 @@ export const registerControllerRoutes = (app: express.Express) => {
   });
 
   app.post("/api/controllers", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireAdminRequester(req, res);
     const { deviceId, label } = req.body ?? {};
-    if (!requester || !ensureAdmin(requester)) {
-      return res.status(403).json({ error: "admin access required" });
-    }
+    if (!requester) return;
     if (!deviceId) {
       return res.status(400).json({ error: "deviceId is required" });
     }
@@ -83,11 +78,9 @@ export const registerControllerRoutes = (app: express.Express) => {
   });
 
   app.post("/api/controllers/claim", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireRequester(req, res);
     const { code, qrData, qrCode, label } = req.body ?? {};
-    if (!requester) {
-      return res.status(401).json({ error: "missing user id" });
-    }
+    if (!requester) return;
     const normalizedCode =
       extractPairingCode(code) ??
       extractPairingCode(qrData) ??
@@ -132,11 +125,9 @@ export const registerControllerRoutes = (app: express.Express) => {
   });
 
   app.delete("/api/controllers/:controllerId", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireAdminRequester(req, res);
     const controllerId = Number(req.params.controllerId);
-    if (!requester || !ensureAdmin(requester)) {
-      return res.status(403).json({ error: "admin access required" });
-    }
+    if (!requester) return;
     if (!controllerId) {
       return res.status(400).json({ error: "invalid controller id" });
     }
@@ -158,9 +149,10 @@ export const registerControllerRoutes = (app: express.Express) => {
   });
 
   app.get("/api/users/:userId/controllers", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireRequester(req, res);
     const userId = Number(req.params.userId);
-    if (!requester || !userId) {
+    if (!requester) return;
+    if (!userId) {
       return res.status(400).json({ error: "invalid user id" });
     }
     if (!ensureAdmin(requester) && requester.id !== userId) {
@@ -191,14 +183,12 @@ export const registerControllerRoutes = (app: express.Express) => {
   });
 
   app.post("/api/users/:userId/controllers", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireAdminRequester(req, res);
     const userId = Number(req.params.userId);
     const { controllerId, label } = req.body ?? {};
-    if (!requester || !userId || !controllerId) {
+    if (!requester) return;
+    if (!userId || !controllerId) {
       return res.status(400).json({ error: "userId and controllerId are required" });
-    }
-    if (!ensureAdmin(requester)) {
-      return res.status(403).json({ error: "admin access required" });
     }
 
     try {
@@ -226,11 +216,12 @@ export const registerControllerRoutes = (app: express.Express) => {
   });
 
   app.patch("/api/users/:userId/controllers/:controllerId", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireRequester(req, res);
     const userId = Number(req.params.userId);
     const controllerId = Number(req.params.controllerId);
     const { label } = req.body ?? {};
-    if (!requester || !userId || !controllerId) {
+    if (!requester) return;
+    if (!userId || !controllerId) {
       return res.status(400).json({ error: "invalid user or controller id" });
     }
     if (!ensureAdmin(requester) && requester.id !== userId) {
@@ -264,10 +255,11 @@ export const registerControllerRoutes = (app: express.Express) => {
   });
 
   app.delete("/api/users/:userId/controllers", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireRequester(req, res);
     const userId = Number(req.params.userId);
     const { controllerId } = req.body ?? {};
-    if (!requester || !userId || !controllerId) {
+    if (!requester) return;
+    if (!userId || !controllerId) {
       return res.status(400).json({ error: "userId and controllerId are required" });
     }
     if (!ensureAdmin(requester) && requester.id !== userId) {

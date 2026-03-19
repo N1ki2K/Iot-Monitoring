@@ -42,7 +42,7 @@ describe("api endpoints", () => {
     email: string;
     role?: string;
     is_admin?: number;
-  }) => string;
+  }) => Promise<string>;
   let extractPairingCode: (raw: unknown) => string | null;
   let normalizeFlag: (value: unknown) => boolean;
   let ensureAdmin: (user: { role: string } | null) => boolean;
@@ -109,7 +109,7 @@ describe("api endpoints", () => {
 
   it("getRequester returns normalized user", async () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
-    const token = createAccessToken({ id: 1, email: "admin@example.com", role: "admin" });
+    const token = await createAccessToken({ id: 1, email: "admin@example.com", role: "admin" });
     const req = {
       header: (name: string) => (name === "authorization" ? `Bearer ${token}` : undefined),
     } as unknown as Request;

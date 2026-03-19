@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import type express from "express";
+import { JWTPayload, SignJWT, errors, jwtVerify } from "jose";
 import { Pool } from "pg";
 
 export const USER_PUBLIC_COLUMNS =
@@ -38,18 +39,12 @@ export const requestMetricsMiddleware: express.RequestHandler = (req, res, next)
   next();
 };
 
-type AccessTokenPayload = {
-  sub: number;
+type AccessTokenPayload = JWTPayload & {
+  sub: string;
   email: string;
   role?: string;
   is_admin: number;
-  iat: number;
-  exp: number;
 };
-
-const encodeBase64Url = (value: string | Buffer) => Buffer.from(value).toString("base64url");
-
-const decodeBase64Url = (value: string) => Buffer.from(value, "base64url").toString("utf8");
 
 export const getJwtSecret = () => {
   const secret = process.env.JWT_SECRET?.trim();
@@ -63,6 +58,23 @@ const getJwtExpirySeconds = () => {
   const parsed = Number(process.env.JWT_EXPIRES_IN_SECONDS ?? 3600);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 3600;
 };
+
+const getJwtSecretBytes = () => new TextEncoder().encode(getJwtSecret());
+
+type AuthFailureReason = "missing" | "invalid" | "expired";
+
+type RequestAuthContext = {
+  failureReason?: AuthFailureReason;
+  tokenPayload?: AccessTokenPayload;
+};
+
+declare global {
+  namespace Express {
+    interface Request {
+      auth?: RequestAuthContext;
+    }
+  }
+}
 
 export const normalizeFlag = (value: unknown) =>
   value === true || value === 1 || value === "1";
@@ -126,84 +138,85 @@ export const extractPairingCode = (raw: unknown): string | null => {
   return match ? match[1] : null;
 };
 
-export const createAccessToken = (user: {
+export const createAccessToken = async (user: {
   id: number;
   email: string;
   role?: string;
   is_admin?: number;
 }) => {
-  const now = Math.floor(Date.now() / 1000);
   const payload: AccessTokenPayload = {
-    sub: user.id,
+    sub: String(user.id),
     email: user.email,
     role: user.role,
     is_admin: user.is_admin ?? 0,
-    iat: now,
-    exp: now + getJwtExpirySeconds(),
   };
-  const header = { alg: "HS256", typ: "JWT" };
-  const encodedHeader = encodeBase64Url(JSON.stringify(header));
-  const encodedPayload = encodeBase64Url(JSON.stringify(payload));
-  const signature = crypto
-    .createHmac("sha256", getJwtSecret())
-    .update(`${encodedHeader}.${encodedPayload}`)
-    .digest("base64url");
-
-  return `${encodedHeader}.${encodedPayload}.${signature}`;
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuedAt()
+    .setExpirationTime(`${getJwtExpirySeconds()}s`)
+    .sign(getJwtSecretBytes());
 };
 
-export const verifyAccessToken = (token: string): AccessTokenPayload | null => {
-  const [encodedHeader, encodedPayload, encodedSignature] = token.split(".");
-  if (!encodedHeader || !encodedPayload || !encodedSignature) {
-    return null;
+export const verifyAccessToken = async (token: string): Promise<AccessTokenPayload> => {
+  const { payload, protectedHeader } = await jwtVerify(token, getJwtSecretBytes(), {
+    algorithms: ["HS256"],
+  });
+  if (protectedHeader.typ !== "JWT") {
+    throw new Error("Invalid token type");
   }
 
-  const expectedSignature = crypto
-    .createHmac("sha256", getJwtSecret())
-    .update(`${encodedHeader}.${encodedPayload}`)
-    .digest("base64url");
-  const actualBuffer = Buffer.from(encodedSignature);
-  const expectedBuffer = Buffer.from(expectedSignature);
-  if (
-    actualBuffer.length !== expectedBuffer.length ||
-    !crypto.timingSafeEqual(actualBuffer, expectedBuffer)
-  ) {
-    return null;
+  const typedPayload = payload as AccessTokenPayload;
+  if (!typedPayload.sub || !typedPayload.email) {
+    throw new Error("Invalid token payload");
+  }
+
+  return typedPayload;
+};
+
+const resolveAuthContext = async (req: express.Request): Promise<RequestAuthContext> => {
+  if (process.env.NODE_ENV === "test") {
+    const fallbackId = Number(req.header("x-user-id"));
+    if (fallbackId) {
+      return {
+        tokenPayload: {
+          sub: String(fallbackId),
+          email: "",
+          is_admin: 0,
+        },
+      };
+    }
+  }
+
+  const authHeader = req.header("authorization");
+  const tokenMatch = authHeader?.match(/^Bearer\s+(.+)$/i);
+  if (!authHeader) {
+    return { failureReason: "missing" };
+  }
+  if (!tokenMatch) {
+    return { failureReason: "invalid" };
   }
 
   try {
-    const header = JSON.parse(decodeBase64Url(encodedHeader)) as { alg?: string; typ?: string };
-    if (header.alg !== "HS256" || header.typ !== "JWT") {
-      return null;
-    }
-
-    const payload = JSON.parse(decodeBase64Url(encodedPayload)) as AccessTokenPayload;
-    if (!payload?.sub || payload.exp <= Math.floor(Date.now() / 1000)) {
-      return null;
-    }
-    return payload;
-  } catch {
-    return null;
+    return {
+      tokenPayload: await verifyAccessToken(tokenMatch[1].trim()),
+    };
+  } catch (error) {
+    return {
+      failureReason: error instanceof errors.JWTExpired ? "expired" : "invalid",
+    };
   }
 };
 
-const extractRequesterId = (req: express.Request) => {
-  const authHeader = req.header("authorization");
-  const tokenMatch = authHeader?.match(/^Bearer\s+(.+)$/i);
-  if (tokenMatch) {
-    return verifyAccessToken(tokenMatch[1].trim())?.sub ?? null;
-  }
-
-  if (process.env.NODE_ENV === "test") {
-    const fallbackId = Number(req.header("x-user-id"));
-    return fallbackId || null;
-  }
-
-  return null;
+export const authContextMiddleware: express.RequestHandler = async (req, _res, next) => {
+  req.auth = await resolveAuthContext(req);
+  next();
 };
 
 export const getRequester = async (req: express.Request) => {
-  const requesterId = extractRequesterId(req);
+  if (!req.auth) {
+    req.auth = await resolveAuthContext(req);
+  }
+  const requesterId = Number(req.auth?.tokenPayload?.sub);
   if (!requesterId) return null;
   const result = await pool.query(
     `SELECT ${USER_PUBLIC_COLUMNS}
@@ -219,6 +232,38 @@ export const getRequester = async (req: express.Request) => {
 export const ensureAdmin = (
   user: { role?: string; is_admin?: number } | null
 ) => Boolean(user && (user.role === "admin" || user.is_admin === 1));
+
+export const sendAuthError = (req: express.Request, res: express.Response) => {
+  const failureReason = req.auth?.failureReason ?? "invalid";
+  const message =
+    failureReason === "missing"
+      ? "missing bearer token"
+      : failureReason === "expired"
+        ? "expired bearer token"
+        : "invalid bearer token";
+  return res.status(401).json({ error: message });
+};
+
+export const requireRequester = async (req: express.Request, res: express.Response) => {
+  const requester = await getRequester(req);
+  if (requester) {
+    return requester;
+  }
+  sendAuthError(req, res);
+  return null;
+};
+
+export const requireAdminRequester = async (req: express.Request, res: express.Response) => {
+  const requester = await requireRequester(req, res);
+  if (!requester) {
+    return null;
+  }
+  if (!ensureAdmin(requester)) {
+    res.status(403).json({ error: "admin access required" });
+    return null;
+  }
+  return requester;
+};
 
 export const generatePairingCode = async () => {
   for (let attempt = 0; attempt < 10; attempt++) {

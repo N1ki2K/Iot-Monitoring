@@ -68,11 +68,9 @@ type RequestAuthContext = {
   tokenPayload?: AccessTokenPayload;
 };
 
-declare global {
-  namespace Express {
-    interface Request {
-      auth?: RequestAuthContext;
-    }
+declare module "express-serve-static-core" {
+  interface Request {
+    auth?: RequestAuthContext;
   }
 }
 

@@ -70,9 +70,10 @@ export const registerAuthRoutes = (app: express.Express) => {
       }
 
       const normalizedUser = normalizeUserRow(user);
-      const { password: _password, ...safeUser } = normalizedUser as typeof normalizedUser & {
+      const safeUser = { ...normalizedUser } as typeof normalizedUser & {
         password?: string;
       };
+      delete safeUser.password;
       const response = {
         ...safeUser,
         invited_by: user.invited_by ?? null,

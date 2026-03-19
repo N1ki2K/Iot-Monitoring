@@ -194,6 +194,7 @@ Notes:
 - `MOBILE_API_URL` must point to your machine's LAN IP for a physical device or emulator setup that cannot use browser localhost.
 - `JWT_SECRET` should be a long random secret and must be set in the root `.env` for backend bearer-token auth.
 - `JWT_EXPIRES_IN_SECONDS` controls access-token lifetime in seconds.
+- The backend now fails startup if `JWT_SECRET` is missing.
 - `infra/.env.example` contains Compose-specific database defaults for the infrastructure stack.
 
 ## Local Setup

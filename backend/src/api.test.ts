@@ -12,6 +12,7 @@ vi.mock("pg", () => ({
 
 const loadApi = async () => {
   process.env.NODE_ENV = "test";
+  process.env.JWT_SECRET = "test-jwt-secret";
   return await import("./api.js");
 };
 

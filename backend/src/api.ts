@@ -9,6 +9,7 @@ import {
   extractPairingCode,
   generatePairingCode,
   getRequester,
+  getJwtSecret,
   hashPassword,
   normalizeFlag,
   requestMetricsMiddleware,
@@ -23,6 +24,10 @@ import { registerReadingRoutes } from "./api/routes/readings.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: resolve(__dirname, "../../.env") });
+
+if (process.env.NODE_ENV !== "test") {
+  getJwtSecret();
+}
 
 export const app = express();
 
@@ -55,6 +60,7 @@ export {
   getRequester,
   createAccessToken,
   ensureAdmin,
+  getJwtSecret,
   normalizeFlag,
   extractPairingCode,
   generatePairingCode,

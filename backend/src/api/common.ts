@@ -51,7 +51,13 @@ const encodeBase64Url = (value: string | Buffer) => Buffer.from(value).toString(
 
 const decodeBase64Url = (value: string) => Buffer.from(value, "base64url").toString("utf8");
 
-const getJwtSecret = () => process.env.JWT_SECRET ?? "dev-jwt-secret-change-me";
+export const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET?.trim();
+  if (!secret) {
+    throw new Error("JWT_SECRET is required");
+  }
+  return secret;
+};
 
 const getJwtExpirySeconds = () => {
   const parsed = Number(process.env.JWT_EXPIRES_IN_SECONDS ?? 3600);

@@ -13,6 +13,7 @@ object ApiClient {
     private const val BASE_URL = BuildConfig.API_BASE_URL
 
     private var userId: Int? = null
+    private var authToken: String? = null
 
     fun setUserId(id: Int?) {
         userId = id
@@ -20,12 +21,18 @@ object ApiClient {
 
     fun getUserId(): Int? = userId
 
+    fun setAuthToken(token: String?) {
+        authToken = token
+    }
+
+    fun getAuthToken(): String? = authToken
+
     private val authInterceptor = Interceptor { chain ->
         val originalRequest = chain.request()
         val requestBuilder = originalRequest.newBuilder()
 
-        userId?.let {
-            requestBuilder.addHeader("x-user-id", it.toString())
+        authToken?.let {
+            requestBuilder.addHeader("Authorization", "Bearer $it")
         }
         requestBuilder.addHeader("x-client", "mobile")
 

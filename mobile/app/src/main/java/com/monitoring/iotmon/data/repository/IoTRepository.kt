@@ -13,6 +13,9 @@ sealed class Result<out T> {
 
 class IoTRepository(private val api: ApiService = ApiClient.apiService) {
 
+    private fun withCurrentToken(user: AuthUser): AuthUser =
+        if (user.token != null) user else user.copy(token = ApiClient.getAuthToken())
+
     // Authentication
     suspend fun login(email: String, password: String): Result<AuthUser> = withContext(Dispatchers.IO) {
         try {
@@ -20,6 +23,7 @@ class IoTRepository(private val api: ApiService = ApiClient.apiService) {
             if (response.isSuccessful && response.body() != null) {
                 val user = response.body()!!
                 ApiClient.setUserId(user.id)
+                ApiClient.setAuthToken(user.token)
                 Result.Success(user)
             } else {
                 val errorBody = response.errorBody()?.string()
@@ -36,6 +40,7 @@ class IoTRepository(private val api: ApiService = ApiClient.apiService) {
             if (response.isSuccessful && response.body() != null) {
                 val user = response.body()!!
                 ApiClient.setUserId(user.id)
+                ApiClient.setAuthToken(user.token)
                 Result.Success(user)
             } else {
                 val errorBody = response.errorBody()?.string()
@@ -50,7 +55,7 @@ class IoTRepository(private val api: ApiService = ApiClient.apiService) {
         try {
             val response = api.getMe()
             if (response.isSuccessful && response.body() != null) {
-                Result.Success(response.body()!!)
+                Result.Success(withCurrentToken(response.body()!!))
             } else {
                 Result.Error("Failed to get user profile")
             }
@@ -63,7 +68,7 @@ class IoTRepository(private val api: ApiService = ApiClient.apiService) {
         try {
             val response = api.updateProfile(UpdateProfileRequest(username, email))
             if (response.isSuccessful && response.body() != null) {
-                Result.Success(response.body()!!)
+                Result.Success(withCurrentToken(response.body()!!))
             } else {
                 val errorBody = response.errorBody()?.string()
                 Result.Error(errorBody ?: "Update failed")
@@ -421,5 +426,6 @@ class IoTRepository(private val api: ApiService = ApiClient.apiService) {
 
     fun logout() {
         ApiClient.setUserId(null)
+        ApiClient.setAuthToken(null)
     }
 }

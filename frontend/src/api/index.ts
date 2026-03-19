@@ -21,24 +21,23 @@ const client = axios.create({
   timeout: 10000,
 });
 
-const getStoredUserId = () => {
+const getStoredAuthUser = () => {
   if (typeof window === 'undefined') return null;
   const stored = localStorage.getItem('authUser');
   if (!stored) return null;
   try {
-    const parsed = JSON.parse(stored) as AuthUser;
-    return parsed.id ?? null;
+    return JSON.parse(stored) as AuthUser;
   } catch {
     return null;
   }
 };
 
 client.interceptors.request.use((config) => {
-  const userId = getStoredUserId();
-  if (userId) {
+  const authUser = getStoredAuthUser();
+  if (authUser?.token) {
     config.headers = config.headers ?? {};
-    if (!config.headers['x-user-id']) {
-      config.headers['x-user-id'] = userId;
+    if (!config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${authUser.token}`;
     }
   }
   config.headers = config.headers ?? {};
@@ -138,11 +137,7 @@ export const api = {
   },
 
   getUserControllers: async (userId: number): Promise<UserControllerAssignment[]> => {
-    const { data } = await client.get<UserControllerAssignment[]>(`/users/${userId}/controllers`, {
-      headers: {
-        'x-user-id': userId,
-      },
-    });
+    const { data } = await client.get<UserControllerAssignment[]>(`/users/${userId}/controllers`);
     return data;
   },
 

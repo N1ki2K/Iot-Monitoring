@@ -1,5 +1,6 @@
 import type express from "express";
 import {
+  createAccessToken,
   getErrorCode,
   hashPassword,
   logAudit,
@@ -25,6 +26,10 @@ export const registerAuthRoutes = (app: express.Express) => {
         [username, email, passwordHash]
       );
       const response = normalizeUserRow(result.rows[0]);
+      const authResponse = {
+        ...response,
+        token: createAccessToken(response),
+      };
       await logAudit({
         req,
         actor: { id: response.id, email: response.email },
@@ -32,7 +37,7 @@ export const registerAuthRoutes = (app: express.Express) => {
         entityType: "user",
         entityId: response.id,
       });
-      return res.status(201).json(response);
+      return res.status(201).json(authResponse);
     } catch (error) {
       if (getErrorCode(error) === "23505") {
         return res.status(409).json({ error: "username or email already exists" });
@@ -64,10 +69,15 @@ export const registerAuthRoutes = (app: express.Express) => {
         return res.status(401).json({ error: "invalid credentials" });
       }
 
+      const normalizedUser = normalizeUserRow(user);
+      const { password: _password, ...safeUser } = normalizedUser as typeof normalizedUser & {
+        password?: string;
+      };
       const response = {
-        ...normalizeUserRow(user),
+        ...safeUser,
         invited_by: user.invited_by ?? null,
         invited_at: user.invited_at ?? null,
+        token: createAccessToken(normalizedUser),
       };
       await logAudit({
         req,

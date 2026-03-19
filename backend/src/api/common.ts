@@ -38,6 +38,26 @@ export const requestMetricsMiddleware: express.RequestHandler = (req, res, next)
   next();
 };
 
+type AccessTokenPayload = {
+  sub: number;
+  email: string;
+  role?: string;
+  is_admin: number;
+  iat: number;
+  exp: number;
+};
+
+const encodeBase64Url = (value: string | Buffer) => Buffer.from(value).toString("base64url");
+
+const decodeBase64Url = (value: string) => Buffer.from(value, "base64url").toString("utf8");
+
+const getJwtSecret = () => process.env.JWT_SECRET ?? "dev-jwt-secret-change-me";
+
+const getJwtExpirySeconds = () => {
+  const parsed = Number(process.env.JWT_EXPIRES_IN_SECONDS ?? 3600);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 3600;
+};
+
 export const normalizeFlag = (value: unknown) =>
   value === true || value === 1 || value === "1";
 
@@ -100,8 +120,84 @@ export const extractPairingCode = (raw: unknown): string | null => {
   return match ? match[1] : null;
 };
 
+export const createAccessToken = (user: {
+  id: number;
+  email: string;
+  role?: string;
+  is_admin?: number;
+}) => {
+  const now = Math.floor(Date.now() / 1000);
+  const payload: AccessTokenPayload = {
+    sub: user.id,
+    email: user.email,
+    role: user.role,
+    is_admin: user.is_admin ?? 0,
+    iat: now,
+    exp: now + getJwtExpirySeconds(),
+  };
+  const header = { alg: "HS256", typ: "JWT" };
+  const encodedHeader = encodeBase64Url(JSON.stringify(header));
+  const encodedPayload = encodeBase64Url(JSON.stringify(payload));
+  const signature = crypto
+    .createHmac("sha256", getJwtSecret())
+    .update(`${encodedHeader}.${encodedPayload}`)
+    .digest("base64url");
+
+  return `${encodedHeader}.${encodedPayload}.${signature}`;
+};
+
+export const verifyAccessToken = (token: string): AccessTokenPayload | null => {
+  const [encodedHeader, encodedPayload, encodedSignature] = token.split(".");
+  if (!encodedHeader || !encodedPayload || !encodedSignature) {
+    return null;
+  }
+
+  const expectedSignature = crypto
+    .createHmac("sha256", getJwtSecret())
+    .update(`${encodedHeader}.${encodedPayload}`)
+    .digest("base64url");
+  const actualBuffer = Buffer.from(encodedSignature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  if (
+    actualBuffer.length !== expectedBuffer.length ||
+    !crypto.timingSafeEqual(actualBuffer, expectedBuffer)
+  ) {
+    return null;
+  }
+
+  try {
+    const header = JSON.parse(decodeBase64Url(encodedHeader)) as { alg?: string; typ?: string };
+    if (header.alg !== "HS256" || header.typ !== "JWT") {
+      return null;
+    }
+
+    const payload = JSON.parse(decodeBase64Url(encodedPayload)) as AccessTokenPayload;
+    if (!payload?.sub || payload.exp <= Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+};
+
+const extractRequesterId = (req: express.Request) => {
+  const authHeader = req.header("authorization");
+  const tokenMatch = authHeader?.match(/^Bearer\s+(.+)$/i);
+  if (tokenMatch) {
+    return verifyAccessToken(tokenMatch[1].trim())?.sub ?? null;
+  }
+
+  if (process.env.NODE_ENV === "test") {
+    const fallbackId = Number(req.header("x-user-id"));
+    return fallbackId || null;
+  }
+
+  return null;
+};
+
 export const getRequester = async (req: express.Request) => {
-  const requesterId = Number(req.header("x-user-id"));
+  const requesterId = extractRequesterId(req);
   if (!requesterId) return null;
   const result = await pool.query(
     `SELECT ${USER_PUBLIC_COLUMNS}

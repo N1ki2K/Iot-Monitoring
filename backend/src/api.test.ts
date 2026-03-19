@@ -36,6 +36,12 @@ describe("api endpoints", () => {
   let hashPassword: (password: string) => Promise<string>;
   let verifyPassword: (password: string, storedHash: string) => Promise<boolean>;
   let generatePairingCode: () => Promise<string>;
+  let createAccessToken: (user: {
+    id: number;
+    email: string;
+    role?: string;
+    is_admin?: number;
+  }) => string;
   let extractPairingCode: (raw: unknown) => string | null;
   let normalizeFlag: (value: unknown) => boolean;
   let ensureAdmin: (user: { role: string } | null) => boolean;
@@ -49,6 +55,7 @@ describe("api endpoints", () => {
       hashPassword,
       verifyPassword,
       generatePairingCode,
+      createAccessToken,
       extractPairingCode,
       normalizeFlag,
       ensureAdmin,
@@ -101,7 +108,10 @@ describe("api endpoints", () => {
 
   it("getRequester returns normalized user", async () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
-    const req = { header: (name: string) => (name === "x-user-id" ? "1" : undefined) } as unknown as Request;
+    const token = createAccessToken({ id: 1, email: "admin@example.com", role: "admin" });
+    const req = {
+      header: (name: string) => (name === "authorization" ? `Bearer ${token}` : undefined),
+    } as unknown as Request;
     const user = await getRequester(req);
     expect(user).toMatchObject({
       id: 1,
@@ -138,6 +148,7 @@ describe("api endpoints", () => {
       .send({ username: "User", email: "user@example.com", password: "pw" });
     expect(res.status).toBe(201);
     expect(res.body.email).toBe("user@example.com");
+    expect(res.body.token).toEqual(expect.any(String));
   });
 
   it("POST /api/auth/register handles duplicates", async () => {
@@ -186,6 +197,7 @@ describe("api endpoints", () => {
       .send({ email: "user@example.com", password: "pw" });
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(2);
+    expect(res.body.token).toEqual(expect.any(String));
   });
 
   it("POST /api/auth/login handles database error", async () => {

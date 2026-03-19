@@ -4,6 +4,7 @@ import { dirname, resolve } from "path";
 import express from "express";
 import cors from "cors";
 import {
+  createAccessToken,
   ensureAdmin,
   extractPairingCode,
   generatePairingCode,
@@ -52,6 +53,7 @@ registerReadingRoutes(app);
 
 export {
   getRequester,
+  createAccessToken,
   ensureAdmin,
   normalizeFlag,
   extractPairingCode,

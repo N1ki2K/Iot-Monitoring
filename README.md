@@ -179,6 +179,8 @@ MQTT_TOPIC=iot/esp32/telemetry
 # API
 PORT=3000
 CORS_ORIGINS=http://localhost:5173
+JWT_SECRET=replace-this-with-a-long-random-secret
+JWT_EXPIRES_IN_SECONDS=3600
 
 # Frontend
 VITE_API_URL=http://localhost:3000/api
@@ -190,6 +192,8 @@ MOBILE_API_URL=http://YOUR-LAN-IP:3000/api
 Notes:
 
 - `MOBILE_API_URL` must point to your machine's LAN IP for a physical device or emulator setup that cannot use browser localhost.
+- `JWT_SECRET` should be a long random secret and must be set in the root `.env` for backend bearer-token auth.
+- `JWT_EXPIRES_IN_SECONDS` controls access-token lifetime in seconds.
 - `infra/.env.example` contains Compose-specific database defaults for the infrastructure stack.
 
 ## Local Setup
@@ -382,6 +386,12 @@ Representative endpoints exposed by `backend/src/api.ts`:
 - `PATCH /api/users/:userId`
 - `DELETE /api/users/:userId`
 - `PATCH /api/users/:userId/role`
+
+Auth behavior:
+
+- `POST /api/auth/register` and `POST /api/auth/login` return the authenticated user plus a JWT access token.
+- Protected backend routes expect `Authorization: Bearer <token>`.
+- The backend signs and verifies bearer tokens using `JWT_SECRET` from the root `.env`.
 
 ### Controllers and assignments
 

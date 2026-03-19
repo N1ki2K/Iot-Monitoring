@@ -8,6 +8,7 @@ data class AuthUser(
     val id: Int,
     val username: String,
     val email: String,
+    val token: String? = null,
     val role: String? = null,
     @SerializedName("is_admin")
     @JsonAdapter(FlexibleIntAdapter::class)

@@ -12,6 +12,11 @@ const isAdminRole = (user: AuthUser) => {
   return isAdminFlag || user.role === 'admin';
 };
 
+const mergeAuthUser = (nextUser: AuthUser, currentUser: AuthUser | null) => ({
+  ...nextUser,
+  token: nextUser.token ?? currentUser?.token,
+});
+
 function App() {
   const [user, setUser] = useState<AuthUser | null>(() => {
     const stored = localStorage.getItem('authUser');
@@ -30,8 +35,11 @@ function App() {
       try {
         const current = await api.getMe();
         if (current) {
-          localStorage.setItem('authUser', JSON.stringify(current));
-          setUser(current);
+          setUser((previous) => {
+            const merged = mergeAuthUser(current, previous);
+            localStorage.setItem('authUser', JSON.stringify(merged));
+            return merged;
+          });
         }
       } catch (error) {
         console.warn('Failed to refresh user:', error);
@@ -41,8 +49,9 @@ function App() {
   }, [userId]);
 
   const handleAuth = (nextUser: AuthUser) => {
-    localStorage.setItem('authUser', JSON.stringify(nextUser));
-    setUser(nextUser);
+    const merged = mergeAuthUser(nextUser, user);
+    localStorage.setItem('authUser', JSON.stringify(merged));
+    setUser(merged);
     if (typeof window !== 'undefined' && window.location.pathname !== '/') {
       window.history.replaceState(null, '', '/');
     }
@@ -54,8 +63,9 @@ function App() {
   };
 
   const handleUserUpdated = (nextUser: AuthUser) => {
-    localStorage.setItem('authUser', JSON.stringify(nextUser));
-    setUser(nextUser);
+    const merged = mergeAuthUser(nextUser, user);
+    localStorage.setItem('authUser', JSON.stringify(merged));
+    setUser(merged);
   };
 
   if (!user) {

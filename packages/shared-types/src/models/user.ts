@@ -9,6 +9,8 @@ export interface AuthUser {
   id: number;
   username: string;
   email: string;
+  token?: string;
+  refreshToken?: string;
   role?: UserRole;
   is_admin?: number | boolean | string;
   invited_by?: number | null;

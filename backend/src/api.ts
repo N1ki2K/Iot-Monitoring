@@ -4,10 +4,13 @@ import { dirname, resolve } from "path";
 import express from "express";
 import cors from "cors";
 import {
+  createAccessToken,
+  authContextMiddleware,
   ensureAdmin,
   extractPairingCode,
   generatePairingCode,
   getRequester,
+  getJwtSecret,
   hashPassword,
   normalizeFlag,
   requestMetricsMiddleware,
@@ -22,6 +25,10 @@ import { registerReadingRoutes } from "./api/routes/readings.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: resolve(__dirname, "../../.env") });
+
+if (process.env.NODE_ENV !== "test") {
+  getJwtSecret();
+}
 
 export const app = express();
 
@@ -38,6 +45,7 @@ app.use(
 );
 app.use(express.json());
 app.use(requestMetricsMiddleware);
+app.use(authContextMiddleware);
 
 app.get("/api/health", (_req, res) => {
   return res.status(200).json({ ok: true });
@@ -52,7 +60,10 @@ registerReadingRoutes(app);
 
 export {
   getRequester,
+  createAccessToken,
+  authContextMiddleware,
   ensureAdmin,
+  getJwtSecret,
   normalizeFlag,
   extractPairingCode,
   generatePairingCode,

@@ -8,6 +8,9 @@ data class AuthUser(
     val id: Int,
     val username: String,
     val email: String,
+    val token: String? = null,
+    @SerializedName("refreshToken")
+    val refreshToken: String? = null,
     val role: String? = null,
     @SerializedName("is_admin")
     @JsonAdapter(FlexibleIntAdapter::class)
@@ -30,6 +33,10 @@ data class RegisterRequest(
     val username: String,
     val email: String,
     val password: String
+)
+
+data class RefreshTokenRequest(
+    val refreshToken: String
 )
 
 data class UpdateProfileRequest(

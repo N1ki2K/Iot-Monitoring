@@ -1,18 +1,15 @@
 import type express from "express";
 import {
-  ensureAdmin,
-  getRequester,
   logAudit,
   pool,
+  requireAdminRequester,
   requestMetrics,
 } from "../common.js";
 
 export const registerAuditRoutes = (app: express.Express) => {
   app.get("/api/audit", async (req, res) => {
-    const requester = await getRequester(req);
-    if (!requester || !ensureAdmin(requester)) {
-      return res.status(403).json({ error: "admin access required" });
-    }
+    const requester = await requireAdminRequester(req, res);
+    if (!requester) return;
 
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
@@ -77,10 +74,8 @@ export const registerAuditRoutes = (app: express.Express) => {
   });
 
   app.delete("/api/audit", async (req, res) => {
-    const requester = await getRequester(req);
-    if (!requester || !ensureAdmin(requester)) {
-      return res.status(403).json({ error: "admin access required" });
-    }
+    const requester = await requireAdminRequester(req, res);
+    if (!requester) return;
 
     const before = req.query.before as string | undefined;
     const all = req.query.all === "true";
@@ -110,10 +105,8 @@ export const registerAuditRoutes = (app: express.Express) => {
   });
 
   app.get("/api/admin/health", async (req, res) => {
-    const requester = await getRequester(req);
-    if (!requester || !ensureAdmin(requester)) {
-      return res.status(403).json({ error: "admin access required" });
-    }
+    const requester = await requireAdminRequester(req, res);
+    if (!requester) return;
 
     try {
       const [

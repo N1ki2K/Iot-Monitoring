@@ -1,28 +1,22 @@
 import type express from "express";
 import {
-  ensureAdmin,
   generateTempPassword,
   getErrorCode,
-  getRequester,
   hashPassword,
   logAudit,
   normalizeUserRow,
   pool,
+  requireAdminRequester,
+  requireRequester,
   USER_PUBLIC_COLUMNS,
 } from "../common.js";
 
 export const registerUserRoutes = (app: express.Express) => {
   app.get("/api/users", async (req, res) => {
-    const requester = await getRequester(req);
-    if (!requester) {
-      return res.status(401).json({ error: "missing user id" });
-    }
+    const requester = await requireAdminRequester(req, res);
+    if (!requester) return;
 
     try {
-      if (!ensureAdmin(requester)) {
-        return res.status(403).json({ error: "admin access required" });
-      }
-
       const result = await pool.query(
         `SELECT ${USER_PUBLIC_COLUMNS}
          FROM users
@@ -37,11 +31,9 @@ export const registerUserRoutes = (app: express.Express) => {
   });
 
   app.post("/api/admin/users/invite", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireAdminRequester(req, res);
     const { username, email, role } = req.body ?? {};
-    if (!requester || !ensureAdmin(requester)) {
-      return res.status(403).json({ error: "admin access required" });
-    }
+    if (!requester) return;
     if (!username || !email) {
       return res.status(400).json({ error: "username and email are required" });
     }
@@ -80,11 +72,9 @@ export const registerUserRoutes = (app: express.Express) => {
   });
 
   app.post("/api/users/refer", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireRequester(req, res);
     const { username, email } = req.body ?? {};
-    if (!requester) {
-      return res.status(401).json({ error: "missing user id" });
-    }
+    if (!requester) return;
     if (!username || !email) {
       return res.status(400).json({ error: "username and email are required" });
     }
@@ -119,13 +109,11 @@ export const registerUserRoutes = (app: express.Express) => {
   });
 
   app.get("/api/users/:userId", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireAdminRequester(req, res);
     const userId = Number(req.params.userId);
-    if (!requester || !userId) {
+    if (!requester) return;
+    if (!userId) {
       return res.status(400).json({ error: "invalid user id" });
-    }
-    if (!ensureAdmin(requester)) {
-      return res.status(403).json({ error: "admin access required" });
     }
 
     try {
@@ -147,14 +135,12 @@ export const registerUserRoutes = (app: express.Express) => {
   });
 
   app.patch("/api/users/:userId", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireAdminRequester(req, res);
     const userId = Number(req.params.userId);
     const { username, email, role, is_admin, must_change_password } = req.body ?? {};
-    if (!requester || !userId) {
+    if (!requester) return;
+    if (!userId) {
       return res.status(400).json({ error: "invalid user id" });
-    }
-    if (!ensureAdmin(requester)) {
-      return res.status(403).json({ error: "admin access required" });
     }
     if (role !== undefined && !["user", "admin"].includes(role)) {
       return res.status(400).json({ error: "invalid role" });
@@ -232,13 +218,11 @@ export const registerUserRoutes = (app: express.Express) => {
   });
 
   app.delete("/api/users/:userId", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireAdminRequester(req, res);
     const userId = Number(req.params.userId);
-    if (!requester || !userId) {
+    if (!requester) return;
+    if (!userId) {
       return res.status(400).json({ error: "invalid user id" });
-    }
-    if (!ensureAdmin(requester)) {
-      return res.status(403).json({ error: "admin access required" });
     }
     if (requester.id === userId) {
       return res.status(400).json({ error: "cannot delete self" });
@@ -277,14 +261,12 @@ export const registerUserRoutes = (app: express.Express) => {
   });
 
   app.patch("/api/users/:userId/role", async (req, res) => {
-    const requester = await getRequester(req);
+    const requester = await requireAdminRequester(req, res);
     const userId = Number(req.params.userId);
     const { role } = req.body ?? {};
-    if (!requester || !userId) {
+    if (!requester) return;
+    if (!userId) {
       return res.status(400).json({ error: "invalid user id" });
-    }
-    if (!ensureAdmin(requester)) {
-      return res.status(403).json({ error: "admin access required" });
     }
     if (!["user", "admin"].includes(role)) {
       return res.status(400).json({ error: "invalid role" });

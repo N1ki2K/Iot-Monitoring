@@ -117,6 +117,17 @@ npm run migrate
 | `MQTT_URL`   | `mqtt://127.0.0.1:1883` | MQTT broker URL             |
 | `MQTT_TOPIC` | `iot/esp32/telemetry` | MQTT topic to subscribe  |
 | `PORT`       | `3000`               | API server port                |
+| `JWT_SECRET` | required             | Secret used to sign access JWTs |
+| `JWT_EXPIRES_IN_SECONDS` | `3600`  | Access-token lifetime in seconds |
+| `JWT_REFRESH_EXPIRES_IN_SECONDS` | `1209600` | Refresh-token lifetime in seconds |
+
+## Authentication
+
+- `POST /api/auth/register` and `POST /api/auth/login` return an access JWT plus an opaque refresh token.
+- Protected routes require `Authorization: Bearer <token>`.
+- `POST /api/auth/refresh` rotates the refresh token and returns a new access token.
+- `POST /api/auth/logout` revokes the submitted refresh token.
+- Refresh tokens are stored hashed in PostgreSQL in the `refresh_tokens` table.
 
 ## Running the Services
 

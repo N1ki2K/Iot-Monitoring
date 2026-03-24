@@ -1,10 +1,15 @@
 import type express from "express";
 import {
+  buildAuthResponse,
+  createAccessToken,
   getErrorCode,
+  getUserByRefreshToken,
   hashPassword,
   logAudit,
   normalizeUserRow,
   pool,
+  revokeRefreshToken,
+  rotateRefreshToken,
   USER_PUBLIC_COLUMNS,
   verifyPassword,
 } from "../common.js";
@@ -25,6 +30,7 @@ export const registerAuthRoutes = (app: express.Express) => {
         [username, email, passwordHash]
       );
       const response = normalizeUserRow(result.rows[0]);
+      const authResponse = await buildAuthResponse(response);
       await logAudit({
         req,
         actor: { id: response.id, email: response.email },
@@ -32,7 +38,7 @@ export const registerAuthRoutes = (app: express.Express) => {
         entityType: "user",
         entityId: response.id,
       });
-      return res.status(201).json(response);
+      return res.status(201).json(authResponse);
     } catch (error) {
       if (getErrorCode(error) === "23505") {
         return res.status(409).json({ error: "username or email already exists" });
@@ -64,11 +70,12 @@ export const registerAuthRoutes = (app: express.Express) => {
         return res.status(401).json({ error: "invalid credentials" });
       }
 
-      const response = {
-        ...normalizeUserRow(user),
+      const normalizedUser = normalizeUserRow(user);
+      const response = await buildAuthResponse({
+        ...normalizedUser,
         invited_by: user.invited_by ?? null,
         invited_at: user.invited_at ?? null,
-      };
+      });
       await logAudit({
         req,
         actor: { id: user.id, email: user.email },
@@ -80,6 +87,61 @@ export const registerAuthRoutes = (app: express.Express) => {
     } catch (error) {
       console.error("Login failed:", error);
       return res.status(500).json({ error: "failed to login" });
+    }
+  });
+
+  app.post("/api/auth/refresh", async (req, res) => {
+    const { refreshToken } = req.body ?? {};
+    if (!refreshToken) {
+      return res.status(400).json({ error: "refreshToken is required" });
+    }
+
+    try {
+      const rotated = await rotateRefreshToken(refreshToken);
+      if (!rotated) {
+        return res.status(401).json({ error: "invalid refresh token" });
+      }
+
+      const response = {
+        ...rotated.user,
+        token: await createAccessToken(rotated.user),
+        refreshToken: rotated.refreshToken,
+      };
+
+      await logAudit({
+        req,
+        actor: { id: rotated.user.id, email: rotated.user.email },
+        action: "user.refresh",
+        entityType: "user",
+        entityId: rotated.user.id,
+      });
+      return res.json(response);
+    } catch (error) {
+      console.error("Refresh failed:", error);
+      return res.status(500).json({ error: "failed to refresh session" });
+    }
+  });
+
+  app.post("/api/auth/logout", async (req, res) => {
+    const { refreshToken } = req.body ?? {};
+    if (!refreshToken) {
+      return res.status(400).json({ error: "refreshToken is required" });
+    }
+
+    try {
+      const session = await getUserByRefreshToken(refreshToken);
+      await revokeRefreshToken(refreshToken);
+      await logAudit({
+        req,
+        actor: session ? { id: session.user.id, email: session.user.email } : null,
+        action: "user.logout",
+        entityType: "user",
+        entityId: session?.user.id ?? null,
+      });
+      return res.status(204).send();
+    } catch (error) {
+      console.error("Logout failed:", error);
+      return res.status(500).json({ error: "failed to logout" });
     }
   });
 };

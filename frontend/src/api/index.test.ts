@@ -7,6 +7,12 @@ const { getMock, postMock, patchMock, deleteMock, createMock, getInterceptor } =
   const patchMock = vi.fn();
   const deleteMock = vi.fn();
   let requestInterceptor: ((config: AxiosRequestConfig) => AxiosRequestConfig) | undefined;
+  let responseSuccessInterceptor:
+    | ((value: unknown) => unknown)
+    | undefined;
+  let responseErrorInterceptor:
+    | ((error: unknown) => Promise<unknown>)
+    | undefined;
 
   const createMock = vi.fn(() => ({
     get: getMock,
@@ -20,6 +26,16 @@ const { getMock, postMock, patchMock, deleteMock, createMock, getInterceptor } =
           return 0;
         },
       },
+      response: {
+        use: (
+          onFulfilled?: (value: unknown) => unknown,
+          onRejected?: (error: unknown) => Promise<unknown>
+        ) => {
+          responseSuccessInterceptor = onFulfilled;
+          responseErrorInterceptor = onRejected;
+          return 0;
+        },
+      },
     },
   }));
 
@@ -30,6 +46,10 @@ const { getMock, postMock, patchMock, deleteMock, createMock, getInterceptor } =
     deleteMock,
     createMock,
     getInterceptor: () => requestInterceptor,
+    getResponseInterceptors: () => ({
+      onFulfilled: responseSuccessInterceptor,
+      onRejected: responseErrorInterceptor,
+    }),
   };
 });
 
@@ -51,34 +71,34 @@ describe('api client', () => {
     vi.clearAllMocks();
   });
 
-  it('injects x-user-id header from localStorage', () => {
-    mockLocalStorage(JSON.stringify({ id: 42 }));
+  it('injects authorization header from localStorage', () => {
+    mockLocalStorage(JSON.stringify({ id: 42, token: 'jwt-token' }));
     const config = getInterceptor()?.({ headers: {} } as AxiosRequestConfig);
-    expect(config?.headers?.['x-user-id']).toBe(42);
+    expect(config?.headers?.Authorization).toBe('Bearer jwt-token');
   });
 
   it('injects x-client header by default', () => {
-    mockLocalStorage(JSON.stringify({ id: 42 }));
+    mockLocalStorage(JSON.stringify({ id: 42, token: 'jwt-token' }));
     const config = getInterceptor()?.({ headers: {} } as AxiosRequestConfig);
     expect(config?.headers?.['x-client']).toBe('web');
   });
 
-  it('does not override existing x-user-id header', () => {
-    mockLocalStorage(JSON.stringify({ id: 42 }));
-    const config = getInterceptor()?.({ headers: { 'x-user-id': 7 } } as AxiosRequestConfig);
-    expect(config?.headers?.['x-user-id']).toBe(7);
+  it('does not override existing authorization header', () => {
+    mockLocalStorage(JSON.stringify({ id: 42, token: 'jwt-token' }));
+    const config = getInterceptor()?.({ headers: { Authorization: 'Bearer existing' } } as AxiosRequestConfig);
+    expect(config?.headers?.Authorization).toBe('Bearer existing');
   });
 
   it('handles invalid authUser JSON in localStorage', () => {
     mockLocalStorage('{bad json');
     const config = getInterceptor()?.({ headers: {} } as AxiosRequestConfig);
-    expect(config?.headers?.['x-user-id']).toBeUndefined();
+    expect(config?.headers?.Authorization).toBeUndefined();
   });
 
   it('handles missing authUser in localStorage', () => {
     mockLocalStorage(null);
     const config = getInterceptor()?.({ headers: {} } as AxiosRequestConfig);
-    expect(config?.headers?.['x-user-id']).toBeUndefined();
+    expect(config?.headers?.Authorization).toBeUndefined();
   });
 
   it('getDevices returns device list', async () => {
@@ -131,12 +151,10 @@ describe('api client', () => {
     expect(postMock).toHaveBeenCalledWith('/auth/login', { email: 'e', password: 'p' });
   });
 
-  it('getUserControllers sends header', async () => {
+  it('getUserControllers calls endpoint', async () => {
     getMock.mockResolvedValueOnce({ data: [] });
     await api.getUserControllers(5);
-    expect(getMock).toHaveBeenCalledWith('/users/5/controllers', {
-      headers: { 'x-user-id': 5 },
-    });
+    expect(getMock).toHaveBeenCalledWith('/users/5/controllers');
   });
 
   it('assignUserController posts controllerId', async () => {

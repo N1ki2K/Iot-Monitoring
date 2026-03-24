@@ -16,6 +16,8 @@ class UserPreferences(private val context: Context) {
         private val USER_ID = intPreferencesKey("user_id")
         private val USERNAME = stringPreferencesKey("username")
         private val EMAIL = stringPreferencesKey("email")
+        private val AUTH_TOKEN = stringPreferencesKey("auth_token")
+        private val REFRESH_TOKEN = stringPreferencesKey("refresh_token")
         private val IS_ADMIN = intPreferencesKey("is_admin")
         private val DARK_MODE = booleanPreferencesKey("dark_mode")
         private val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
@@ -88,6 +90,8 @@ class UserPreferences(private val context: Context) {
                 id = userId,
                 username = preferences[USERNAME] ?: "",
                 email = preferences[EMAIL] ?: "",
+                token = preferences[AUTH_TOKEN],
+                refreshToken = preferences[REFRESH_TOKEN],
                 isAdmin = preferences[IS_ADMIN] ?: 0
             )
         } else {
@@ -100,6 +104,8 @@ class UserPreferences(private val context: Context) {
             preferences[USER_ID] = user.id
             preferences[USERNAME] = user.username
             preferences[EMAIL] = user.email
+            user.token?.let { preferences[AUTH_TOKEN] = it }
+            user.refreshToken?.let { preferences[REFRESH_TOKEN] = it }
             preferences[IS_ADMIN] = user.isAdmin
         }
     }
@@ -108,6 +114,12 @@ class UserPreferences(private val context: Context) {
         context.dataStore.edit { preferences ->
             preferences[USERNAME] = user.username
             preferences[EMAIL] = user.email
+            if (user.token != null) {
+                preferences[AUTH_TOKEN] = user.token
+            }
+            if (user.refreshToken != null) {
+                preferences[REFRESH_TOKEN] = user.refreshToken
+            }
         }
     }
 

@@ -12,6 +12,12 @@ const isAdminRole = (user: AuthUser) => {
   return isAdminFlag || user.role === 'admin';
 };
 
+const mergeAuthUser = (nextUser: AuthUser, currentUser: AuthUser | null) => ({
+  ...nextUser,
+  token: nextUser.token ?? currentUser?.token,
+  refreshToken: nextUser.refreshToken ?? currentUser?.refreshToken,
+});
+
 function App() {
   const [user, setUser] = useState<AuthUser | null>(() => {
     const stored = localStorage.getItem('authUser');
@@ -30,8 +36,11 @@ function App() {
       try {
         const current = await api.getMe();
         if (current) {
-          localStorage.setItem('authUser', JSON.stringify(current));
-          setUser(current);
+          setUser((previous) => {
+            const merged = mergeAuthUser(current, previous);
+            localStorage.setItem('authUser', JSON.stringify(merged));
+            return merged;
+          });
         }
       } catch (error) {
         console.warn('Failed to refresh user:', error);
@@ -41,21 +50,31 @@ function App() {
   }, [userId]);
 
   const handleAuth = (nextUser: AuthUser) => {
-    localStorage.setItem('authUser', JSON.stringify(nextUser));
-    setUser(nextUser);
+    const merged = mergeAuthUser(nextUser, user);
+    localStorage.setItem('authUser', JSON.stringify(merged));
+    setUser(merged);
     if (typeof window !== 'undefined' && window.location.pathname !== '/') {
       window.history.replaceState(null, '', '/');
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const currentRefreshToken = user?.refreshToken;
+    if (currentRefreshToken) {
+      try {
+        await api.logout(currentRefreshToken);
+      } catch (error) {
+        console.warn('Failed to revoke refresh token:', error);
+      }
+    }
     localStorage.removeItem('authUser');
     setUser(null);
   };
 
   const handleUserUpdated = (nextUser: AuthUser) => {
-    localStorage.setItem('authUser', JSON.stringify(nextUser));
-    setUser(nextUser);
+    const merged = mergeAuthUser(nextUser, user);
+    localStorage.setItem('authUser', JSON.stringify(merged));
+    setUser(merged);
   };
 
   if (!user) {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
-import type { Express, Request } from "express";
+import type { Express, Request, Response } from "express";
+import { SignJWT } from "jose";
 
 let queryMock: ReturnType<typeof vi.fn>;
 
@@ -12,6 +13,7 @@ vi.mock("pg", () => ({
 
 const loadApi = async () => {
   process.env.NODE_ENV = "test";
+  process.env.JWT_SECRET = "test-jwt-secret";
   return await import("./api.js");
 };
 
@@ -36,7 +38,19 @@ describe("api endpoints", () => {
   let hashPassword: (password: string) => Promise<string>;
   let verifyPassword: (password: string, storedHash: string) => Promise<boolean>;
   let generatePairingCode: () => Promise<string>;
+  let createAccessToken: (user: {
+    id: number;
+    email: string;
+    role?: string;
+    is_admin?: number;
+  }) => Promise<string>;
+  let authContextMiddleware: (
+    req: Request,
+    res: Response,
+    next: () => void
+  ) => unknown;
   let extractPairingCode: (raw: unknown) => string | null;
+  let getJwtSecret: () => string;
   let normalizeFlag: (value: unknown) => boolean;
   let ensureAdmin: (user: { role: string } | null) => boolean;
   let getRequester: (req: Request) => Promise<{ id: number; role: string } | null>;
@@ -49,11 +63,23 @@ describe("api endpoints", () => {
       hashPassword,
       verifyPassword,
       generatePairingCode,
+      createAccessToken,
+      authContextMiddleware,
       extractPairingCode,
+      getJwtSecret,
       normalizeFlag,
       ensureAdmin,
       getRequester,
     } = await loadApi());
+  });
+
+  const authHeaderFor = async (user: {
+    id: number;
+    email: string;
+    role?: string;
+    is_admin?: number;
+  }) => ({
+    Authorization: `Bearer ${await createAccessToken(user)}`,
   });
 
   it("GET /api/health returns ok", async () => {
@@ -101,13 +127,60 @@ describe("api endpoints", () => {
 
   it("getRequester returns normalized user", async () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
-    const req = { header: (name: string) => (name === "x-user-id" ? "1" : undefined) } as unknown as Request;
+    const token = await createAccessToken({ id: 1, email: "admin@example.com", role: "admin" });
+    const req = {
+      header: (name: string) => (name === "authorization" ? `Bearer ${token}` : undefined),
+    } as unknown as Request;
     const user = await getRequester(req);
     expect(user).toMatchObject({
       id: 1,
       role: "admin",
       username: "Admin",
     });
+  });
+
+  it("authContextMiddleware marks missing bearer token", async () => {
+    const req = { header: () => undefined } as unknown as Request;
+    await authContextMiddleware(req, {} as Response, () => undefined);
+    expect(req.auth?.failureReason).toBe("missing");
+  });
+
+  it("authContextMiddleware marks malformed bearer token", async () => {
+    const req = {
+      header: (name: string) => (name === "authorization" ? "Token abc" : undefined),
+    } as unknown as Request;
+    await authContextMiddleware(req, {} as Response, () => undefined);
+    expect(req.auth?.failureReason).toBe("invalid");
+  });
+
+  it("authContextMiddleware marks tampered bearer token", async () => {
+    const token = await createAccessToken(adminRow);
+    const req = {
+      header: (name: string) =>
+        name === "authorization" ? `Bearer ${token.slice(0, -1)}x` : undefined,
+    } as unknown as Request;
+    await authContextMiddleware(req, {} as Response, () => undefined);
+    expect(req.auth?.failureReason).toBe("invalid");
+  });
+
+  it("authContextMiddleware marks expired bearer token", async () => {
+    const expiredToken = await new SignJWT({
+      sub: String(adminRow.id),
+      email: adminRow.email,
+      role: adminRow.role,
+      is_admin: 0,
+    })
+      .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setIssuedAt(Math.floor(Date.now() / 1000) - 120)
+      .setExpirationTime(Math.floor(Date.now() / 1000) - 60)
+      .sign(new TextEncoder().encode(getJwtSecret()));
+
+    const req = {
+      header: (name: string) =>
+        name === "authorization" ? `Bearer ${expiredToken}` : undefined,
+    } as unknown as Request;
+    await authContextMiddleware(req, {} as Response, () => undefined);
+    expect(req.auth?.failureReason).toBe("expired");
   });
 
   it("generatePairingCode retries until unique", async () => {
@@ -132,12 +205,16 @@ describe("api endpoints", () => {
   });
 
   it("POST /api/auth/register creates user", async () => {
-    queryMock.mockResolvedValueOnce({ rows: [userRow] });
+    queryMock
+      .mockResolvedValueOnce({ rows: [userRow] })
+      .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .post("/api/auth/register")
       .send({ username: "User", email: "user@example.com", password: "pw" });
     expect(res.status).toBe(201);
     expect(res.body.email).toBe("user@example.com");
+    expect(res.body.token).toEqual(expect.any(String));
+    expect(res.body.refreshToken).toEqual(expect.any(String));
   });
 
   it("POST /api/auth/register handles duplicates", async () => {
@@ -180,12 +257,16 @@ describe("api endpoints", () => {
 
   it("POST /api/auth/login succeeds", async () => {
     const goodHash = await hashPassword("pw");
-    queryMock.mockResolvedValueOnce({ rows: [{ ...userRow, password: goodHash }] });
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ ...userRow, password: goodHash }] })
+      .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .post("/api/auth/login")
       .send({ email: "user@example.com", password: "pw" });
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(2);
+    expect(res.body.token).toEqual(expect.any(String));
+    expect(res.body.refreshToken).toEqual(expect.any(String));
   });
 
   it("POST /api/auth/login handles database error", async () => {
@@ -196,6 +277,16 @@ describe("api endpoints", () => {
     expect(res.status).toBe(500);
   });
 
+  it("POST /api/auth/refresh validates payload", async () => {
+    const res = await request(app).post("/api/auth/refresh").send({});
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/auth/logout validates payload", async () => {
+    const res = await request(app).post("/api/auth/logout").send({});
+    expect(res.status).toBe(400);
+  });
+
   it("GET /api/me requires auth", async () => {
     const res = await request(app).get("/api/me");
     expect(res.status).toBe(401);
@@ -203,14 +294,14 @@ describe("api endpoints", () => {
 
   it("GET /api/me returns requester", async () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
-    const res = await request(app).get("/api/me").set("x-user-id", "2");
+    const res = await request(app).get("/api/me").set(await authHeaderFor(userRow));
     expect(res.status).toBe(200);
     expect(res.body.email).toBe("user@example.com");
   });
 
   it("PATCH /api/me validates fields", async () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
-    const res = await request(app).patch("/api/me").set("x-user-id", "2").send({});
+    const res = await request(app).patch("/api/me").set(await authHeaderFor(userRow)).send({});
     expect(res.status).toBe(400);
   });
 
@@ -227,7 +318,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [{ ...userRow, username: "Updated" }] });
     const res = await request(app)
       .patch("/api/me")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ username: "Updated", email: "user@example.com" });
     expect(res.status).toBe(200);
     expect(res.body.username).toBe("Updated");
@@ -241,7 +332,7 @@ describe("api endpoints", () => {
       .mockRejectedValueOnce(err);
     const res = await request(app)
       .patch("/api/me")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ username: "Updated", email: "user@example.com" });
     expect(res.status).toBe(409);
   });
@@ -252,7 +343,7 @@ describe("api endpoints", () => {
       .mockRejectedValueOnce(new Error("db"));
     const res = await request(app)
       .patch("/api/me")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ username: "Updated", email: "user@example.com" });
     expect(res.status).toBe(500);
   });
@@ -261,7 +352,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .patch("/api/me/password")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({});
     expect(res.status).toBe(400);
   });
@@ -272,7 +363,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [{ password: await hashPassword("old") }] });
     const res = await request(app)
       .patch("/api/me/password")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ currentPassword: "nope", newPassword: "new" });
     expect(res.status).toBe(401);
   });
@@ -283,7 +374,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .patch("/api/me/password")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ currentPassword: "old", newPassword: "new" });
     expect(res.status).toBe(404);
   });
@@ -295,7 +386,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .patch("/api/me/password")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ currentPassword: "old", newPassword: "new" });
     expect(res.status).toBe(204);
   });
@@ -306,7 +397,7 @@ describe("api endpoints", () => {
       .mockRejectedValueOnce(new Error("db"));
     const res = await request(app)
       .patch("/api/me/password")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ currentPassword: "old", newPassword: "new" });
     expect(res.status).toBe(500);
   });
@@ -315,7 +406,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [userRow] })
       .mockResolvedValueOnce({ rows: [] });
-    const res = await request(app).delete("/api/me").set("x-user-id", "2");
+    const res = await request(app).delete("/api/me").set(await authHeaderFor(userRow));
     expect(res.status).toBe(204);
   });
 
@@ -328,7 +419,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [userRow] })
       .mockRejectedValueOnce(new Error("db"));
-    const res = await request(app).delete("/api/me").set("x-user-id", "2");
+    const res = await request(app).delete("/api/me").set(await authHeaderFor(userRow));
     expect(res.status).toBe(500);
   });
 
@@ -339,7 +430,7 @@ describe("api endpoints", () => {
 
   it("GET /api/users requires admin", async () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
-    const res = await request(app).get("/api/users").set("x-user-id", "2");
+    const res = await request(app).get("/api/users").set(await authHeaderFor(userRow));
     expect(res.status).toBe(403);
   });
 
@@ -347,7 +438,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [userRow] });
-    const res = await request(app).get("/api/users").set("x-user-id", "1");
+    const res = await request(app).get("/api/users").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
   });
@@ -356,7 +447,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .post("/api/admin/users/invite")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ username: "New", email: "new@example.com" });
     expect(res.status).toBe(403);
   });
@@ -365,7 +456,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
     const res = await request(app)
       .post("/api/admin/users/invite")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({});
     expect(res.status).toBe(400);
   });
@@ -385,7 +476,7 @@ describe("api endpoints", () => {
       });
     const res = await request(app)
       .post("/api/admin/users/invite")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ username: "New", email: "new@example.com" });
     expect(res.status).toBe(201);
     expect(res.body.user.email).toBe("new@example.com");
@@ -396,7 +487,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
     const res = await request(app)
       .post("/api/admin/users/invite")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ username: "New", email: "new@example.com", role: "invalid" });
     expect(res.status).toBe(400);
   });
@@ -405,7 +496,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .post("/api/admin/users/invite")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ username: "New", email: "new@example.com", role: "admin" });
     expect(res.status).toBe(403);
   });
@@ -416,7 +507,7 @@ describe("api endpoints", () => {
       .mockRejectedValueOnce({ code: "23505" });
     const res = await request(app)
       .post("/api/admin/users/invite")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ username: "New", email: "new@example.com" });
     expect(res.status).toBe(409);
   });
@@ -432,7 +523,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .post("/api/users/refer")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({});
     expect(res.status).toBe(400);
   });
@@ -454,7 +545,7 @@ describe("api endpoints", () => {
       });
     const res = await request(app)
       .post("/api/users/refer")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ username: "Friend", email: "friend@example.com" });
     expect(res.status).toBe(201);
     expect(res.body.user.email).toBe("friend@example.com");
@@ -464,7 +555,7 @@ describe("api endpoints", () => {
 
   it("GET /api/users/:id rejects non-admin", async () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
-    const res = await request(app).get("/api/users/2").set("x-user-id", "2");
+    const res = await request(app).get("/api/users/2").set(await authHeaderFor(userRow));
     expect(res.status).toBe(403);
   });
 
@@ -472,7 +563,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [] });
-    const res = await request(app).get("/api/users/99").set("x-user-id", "1");
+    const res = await request(app).get("/api/users/99").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(404);
   });
 
@@ -480,7 +571,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [userRow] });
-    const res = await request(app).get("/api/users/2").set("x-user-id", "1");
+    const res = await request(app).get("/api/users/2").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
     expect(res.body.email).toBe("user@example.com");
   });
@@ -489,7 +580,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .patch("/api/users/2")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ username: "Updated" });
     expect(res.status).toBe(403);
   });
@@ -498,7 +589,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .patch("/api/users/2")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ role: "admin" });
     expect(res.status).toBe(403);
   });
@@ -507,7 +598,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
     const res = await request(app)
       .patch("/api/users/2")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({});
     expect(res.status).toBe(400);
   });
@@ -518,7 +609,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [{ ...userRow, username: "Updated" }] });
     const res = await request(app)
       .patch("/api/users/2")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ username: "Updated" });
     expect(res.status).toBe(200);
     expect(res.body.username).toBe("Updated");
@@ -530,7 +621,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [{ ...userRow, is_admin: true }] });
     const res = await request(app)
       .patch("/api/users/2")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ is_admin: true });
     expect(res.status).toBe(200);
   });
@@ -541,7 +632,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [{ ...userRow, must_change_password: true }] });
     const res = await request(app)
       .patch("/api/users/2")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ must_change_password: true });
     expect(res.status).toBe(200);
   });
@@ -552,7 +643,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .patch("/api/users/999")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ username: "new" });
     expect(res.status).toBe(404);
   });
@@ -565,20 +656,20 @@ describe("api endpoints", () => {
       .mockRejectedValueOnce(err);
     const res = await request(app)
       .patch("/api/users/2")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ email: "taken@example.com" });
     expect(res.status).toBe(409);
   });
 
   it("DELETE /api/users/:id requires admin", async () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
-    const res = await request(app).delete("/api/users/2").set("x-user-id", "2");
+    const res = await request(app).delete("/api/users/2").set(await authHeaderFor(userRow));
     expect(res.status).toBe(403);
   });
 
   it("DELETE /api/users/:id rejects deleting self", async () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
-    const res = await request(app).delete("/api/users/1").set("x-user-id", "1");
+    const res = await request(app).delete("/api/users/1").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(400);
   });
 
@@ -586,7 +677,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [userRow] })
       .mockResolvedValueOnce({ rows: [userRow] });
-    const res = await request(app).delete("/api/users/2").set("x-user-id", "1");
+    const res = await request(app).delete("/api/users/2").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(403);
   });
 
@@ -595,7 +686,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [userRow] })
       .mockResolvedValueOnce({ rows: [{ id: 2, email: "user@example.com" }] });
-    const res = await request(app).delete("/api/users/2").set("x-user-id", "1");
+    const res = await request(app).delete("/api/users/2").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(204);
   });
 
@@ -604,7 +695,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [userRow] })
       .mockResolvedValueOnce({ rows: [{ id: 2, email: "user@example.com" }] });
-    const res = await request(app).delete("/api/users/2").set("x-user-id", "1");
+    const res = await request(app).delete("/api/users/2").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(204);
   });
 
@@ -612,7 +703,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [] });
-    const res = await request(app).delete("/api/users/999").set("x-user-id", "1");
+    const res = await request(app).delete("/api/users/999").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(404);
   });
 
@@ -621,7 +712,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [userRow] })
       .mockRejectedValueOnce(new Error("db"));
-    const res = await request(app).delete("/api/users/2").set("x-user-id", "1");
+    const res = await request(app).delete("/api/users/2").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(500);
   });
 
@@ -629,7 +720,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .patch("/api/users/2/role")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ role: "admin" });
     expect(res.status).toBe(403);
   });
@@ -638,7 +729,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
     const res = await request(app)
       .patch("/api/users/2/role")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ role: "nope" });
     expect(res.status).toBe(400);
   });
@@ -649,7 +740,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [{ ...userRow, role: "admin" }] });
     const res = await request(app)
       .patch("/api/users/2/role")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ role: "admin" });
     expect(res.status).toBe(200);
     expect(res.body.role).toBe("admin");
@@ -661,7 +752,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .patch("/api/users/999/role")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ role: "admin" });
     expect(res.status).toBe(404);
   });
@@ -672,14 +763,14 @@ describe("api endpoints", () => {
       .mockRejectedValueOnce(new Error("db"));
     const res = await request(app)
       .patch("/api/users/2/role")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ role: "admin" });
     expect(res.status).toBe(500);
   });
 
   it("GET /api/audit rejects non-elevated", async () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
-    const res = await request(app).get("/api/audit").set("x-user-id", "1");
+    const res = await request(app).get("/api/audit").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(403);
   });
 
@@ -688,7 +779,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [{ count: "1" }] })
       .mockResolvedValueOnce({ rows: [{ id: 1, action: "user.login", entity_type: "user" }] });
-    const res = await request(app).get("/api/audit").set("x-user-id", "1");
+    const res = await request(app).get("/api/audit").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
   });
@@ -701,7 +792,7 @@ describe("api endpoints", () => {
     const res = await request(app)
       .get("/api/audit")
       .query({ actorId: 1, action: "user.login", entityType: "user" })
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
   });
 
@@ -712,7 +803,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [{ id: 1 }] });
     const res = await request(app)
       .get("/api/audit?entityType=user")
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
   });
 
@@ -723,19 +814,19 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [{ id: 1 }] });
     const res = await request(app)
       .get("/api/audit?entityId=42")
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
   });
 
   it("DELETE /api/audit rejects non-elevated", async () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
-    const res = await request(app).delete("/api/audit").set("x-user-id", "1");
+    const res = await request(app).delete("/api/audit").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(403);
   });
 
   it("DELETE /api/audit requires before or all", async () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
-    const res = await request(app).delete("/api/audit").set("x-user-id", "1");
+    const res = await request(app).delete("/api/audit").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(400);
   });
 
@@ -745,7 +836,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .delete("/api/audit?all=true")
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(204);
   });
 
@@ -755,7 +846,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .delete("/api/audit?before=2024-01-01T00:00:00.000Z")
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(204);
   });
 
@@ -763,7 +854,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockRejectedValueOnce(new Error("db"));
-    const res = await request(app).get("/api/audit").set("x-user-id", "1");
+    const res = await request(app).get("/api/audit").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(500);
   });
 
@@ -771,13 +862,13 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockRejectedValueOnce(new Error("db"));
-    const res = await request(app).delete("/api/audit?all=true").set("x-user-id", "1");
+    const res = await request(app).delete("/api/audit?all=true").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(500);
   });
 
   it("GET /api/admin/health requires admin", async () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
-    const res = await request(app).get("/api/admin/health").set("x-user-id", "2");
+    const res = await request(app).get("/api/admin/health").set(await authHeaderFor(userRow));
     expect(res.status).toBe(403);
   });
 
@@ -801,7 +892,7 @@ describe("api endpoints", () => {
               },
         ],
       });
-    const res = await request(app).get("/api/admin/health").set("x-user-id", "1");
+    const res = await request(app).get("/api/admin/health").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
       requests: expect.objectContaining({
@@ -833,13 +924,13 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockRejectedValueOnce(new Error("db error"));
-    const res = await request(app).get("/api/admin/health").set("x-user-id", "1");
+    const res = await request(app).get("/api/admin/health").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(500);
   });
 
   it("GET /api/controllers requires admin", async () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
-    const res = await request(app).get("/api/controllers").set("x-user-id", "2");
+    const res = await request(app).get("/api/controllers").set(await authHeaderFor(userRow));
     expect(res.status).toBe(403);
   });
 
@@ -847,7 +938,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [{ id: 1, device_id: "dev1" }] });
-    const res = await request(app).get("/api/controllers").set("x-user-id", "1");
+    const res = await request(app).get("/api/controllers").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
   });
@@ -856,7 +947,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockRejectedValueOnce(new Error("db"));
-    const res = await request(app).get("/api/controllers").set("x-user-id", "1");
+    const res = await request(app).get("/api/controllers").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(500);
   });
 
@@ -864,7 +955,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .get("/api/controllers/available-devices")
-      .set("x-user-id", "2");
+      .set(await authHeaderFor(userRow));
     expect(res.status).toBe(403);
   });
 
@@ -874,7 +965,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [{ device_id: "dev1" }, { device_id: "dev2" }] });
     const res = await request(app)
       .get("/api/controllers/available-devices")
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
     expect(res.body).toEqual(["dev1", "dev2"]);
   });
@@ -885,7 +976,7 @@ describe("api endpoints", () => {
       .mockRejectedValueOnce(new Error("db"));
     const res = await request(app)
       .get("/api/controllers/available-devices")
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(500);
   });
 
@@ -893,7 +984,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .post("/api/controllers")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ deviceId: "dev1" });
     expect(res.status).toBe(403);
   });
@@ -902,7 +993,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
     const res = await request(app)
       .post("/api/controllers")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({});
     expect(res.status).toBe(400);
   });
@@ -914,7 +1005,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [{ id: 1, device_id: "dev1", label: null, pairing_code: "12345" }] });
     const res = await request(app)
       .post("/api/controllers")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ deviceId: "dev1" });
     expect(res.status).toBe(201);
     expect(res.body.device_id).toBe("dev1");
@@ -927,7 +1018,7 @@ describe("api endpoints", () => {
       .mockRejectedValueOnce(new Error("db"));
     const res = await request(app)
       .post("/api/controllers")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ deviceId: "dev1" });
     expect(res.status).toBe(500);
   });
@@ -941,7 +1032,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .post("/api/controllers/claim")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({});
     expect(res.status).toBe(400);
   });
@@ -950,7 +1041,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .post("/api/controllers/claim")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ code: "abc" });
     expect(res.status).toBe(400);
   });
@@ -961,7 +1052,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .post("/api/controllers/claim")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ code: "12345" });
     expect(res.status).toBe(404);
   });
@@ -973,7 +1064,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .post("/api/controllers/claim")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ code: "12345" });
     expect(res.status).toBe(200);
     expect(res.body.controller.device_id).toBe("dev1");
@@ -986,7 +1077,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({});
     const res = await request(app)
       .post("/api/controllers/claim")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ qrData: "https://example.com/claim?pairingCode=12345" });
     expect(res.status).toBe(200);
     expect(res.body.controller.device_id).toBe("dev1");
@@ -999,7 +1090,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({});
     const res = await request(app)
       .post("/api/controllers/claim")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ qrData: "{\"pairing_code\":\"12345\"}" });
     expect(res.status).toBe(200);
     expect(res.body.controller.device_id).toBe("dev1");
@@ -1011,7 +1102,7 @@ describe("api endpoints", () => {
       .mockRejectedValueOnce(new Error("db"));
     const res = await request(app)
       .post("/api/controllers/claim")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ code: "12345" });
     expect(res.status).toBe(500);
   });
@@ -1022,19 +1113,19 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .delete("/api/controllers/5")
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(204);
   });
 
   it("DELETE /api/controllers/:id rejects non-admin", async () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
-    const res = await request(app).delete("/api/controllers/1").set("x-user-id", "2");
+    const res = await request(app).delete("/api/controllers/1").set(await authHeaderFor(userRow));
     expect(res.status).toBe(403);
   });
 
   it("DELETE /api/controllers/:id rejects invalid id", async () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
-    const res = await request(app).delete("/api/controllers/abc").set("x-user-id", "1");
+    const res = await request(app).delete("/api/controllers/abc").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(400);
   });
 
@@ -1042,19 +1133,19 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockRejectedValueOnce(new Error("db error"));
-    const res = await request(app).delete("/api/controllers/1").set("x-user-id", "1");
+    const res = await request(app).delete("/api/controllers/1").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(500);
   });
 
   it("GET /api/users/:id/controllers enforces access", async () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
-    const res = await request(app).get("/api/users/1/controllers").set("x-user-id", "2");
+    const res = await request(app).get("/api/users/1/controllers").set(await authHeaderFor(userRow));
     expect(res.status).toBe(403);
   });
 
   it("GET /api/users/:id/controllers rejects invalid user id", async () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
-    const res = await request(app).get("/api/users/abc/controllers").set("x-user-id", "1");
+    const res = await request(app).get("/api/users/abc/controllers").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(400);
   });
 
@@ -1062,7 +1153,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockRejectedValueOnce(new Error("db error"));
-    const res = await request(app).get("/api/users/2/controllers").set("x-user-id", "1");
+    const res = await request(app).get("/api/users/2/controllers").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(500);
   });
 
@@ -1070,7 +1161,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [userRow] })
       .mockResolvedValueOnce({ rows: [{ controller_id: 1, device_id: "dev1" }] });
-    const res = await request(app).get("/api/users/2/controllers").set("x-user-id", "2");
+    const res = await request(app).get("/api/users/2/controllers").set(await authHeaderFor(userRow));
     expect(res.status).toBe(200);
     expect(res.body[0].device_id).toBe("dev1");
   });
@@ -1081,7 +1172,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [{ user_id: 2, controller_id: 5 }] });
     const res = await request(app)
       .post("/api/users/2/controllers")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ controllerId: 5 });
     expect(res.status).toBe(201);
   });
@@ -1090,7 +1181,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
     const res = await request(app)
       .post("/api/users/2/controllers")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({});
     expect(res.status).toBe(400);
   });
@@ -1099,7 +1190,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .post("/api/users/2/controllers")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ controllerId: 1 });
     expect(res.status).toBe(403);
   });
@@ -1110,7 +1201,7 @@ describe("api endpoints", () => {
       .mockRejectedValueOnce(new Error("db error"));
     const res = await request(app)
       .post("/api/users/2/controllers")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ controllerId: 1 });
     expect(res.status).toBe(500);
   });
@@ -1121,7 +1212,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 2, controller_id: 5, label: "Kitchen" }] });
     const res = await request(app)
       .patch("/api/users/2/controllers/5")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ label: "Kitchen" });
     expect(res.status).toBe(200);
     expect(res.body.label).toBe("Kitchen");
@@ -1131,7 +1222,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
     const res = await request(app)
       .patch("/api/users/abc/controllers/xyz")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ label: "test" });
     expect(res.status).toBe(400);
   });
@@ -1140,7 +1231,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .patch("/api/users/3/controllers/1")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ label: "test" });
     expect(res.status).toBe(403);
   });
@@ -1151,7 +1242,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rowCount: 0, rows: [] });
     const res = await request(app)
       .patch("/api/users/2/controllers/5")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ label: "Kitchen" });
     expect(res.status).toBe(404);
   });
@@ -1162,7 +1253,7 @@ describe("api endpoints", () => {
       .mockRejectedValueOnce(new Error("db error"));
     const res = await request(app)
       .patch("/api/users/2/controllers/5")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ label: "Kitchen" });
     expect(res.status).toBe(500);
   });
@@ -1171,7 +1262,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [adminRow] });
     const res = await request(app)
       .delete("/api/users/2/controllers")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({});
     expect(res.status).toBe(400);
   });
@@ -1180,7 +1271,7 @@ describe("api endpoints", () => {
     queryMock.mockResolvedValueOnce({ rows: [userRow] });
     const res = await request(app)
       .delete("/api/users/1/controllers")
-      .set("x-user-id", "2")
+      .set(await authHeaderFor(userRow))
       .send({ controllerId: 5 });
     expect(res.status).toBe(403);
   });
@@ -1191,7 +1282,7 @@ describe("api endpoints", () => {
       .mockRejectedValueOnce(new Error("db error"));
     const res = await request(app)
       .delete("/api/users/2/controllers")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ controllerId: 5 });
     expect(res.status).toBe(500);
   });
@@ -1202,7 +1293,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .delete("/api/users/2/controllers")
-      .set("x-user-id", "1")
+      .set(await authHeaderFor(adminRow))
       .send({ controllerId: 5 });
     expect(res.status).toBe(204);
   });
@@ -1211,7 +1302,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [userRow] })
       .mockResolvedValueOnce({ rows: [{ device_id: "dev1" }, { device_id: "dev2" }] });
-    const res = await request(app).get("/api/devices").set("x-user-id", "2");
+    const res = await request(app).get("/api/devices").set(await authHeaderFor(userRow));
     expect(res.status).toBe(200);
     expect(res.body).toEqual(["dev1", "dev2"]);
   });
@@ -1220,7 +1311,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [{ device_id: "dev1" }, { device_id: "dev2" }] });
-    const res = await request(app).get("/api/devices").set("x-user-id", "1");
+    const res = await request(app).get("/api/devices").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
     expect(res.body).toEqual(["dev1", "dev2"]);
   });
@@ -1229,7 +1320,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [userRow] })
       .mockResolvedValueOnce({ rowCount: 0, rows: [] });
-    const res = await request(app).get("/api/latest/dev1").set("x-user-id", "2");
+    const res = await request(app).get("/api/latest/dev1").set(await authHeaderFor(userRow));
     expect(res.status).toBe(403);
   });
 
@@ -1237,7 +1328,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [{ id: 1, device_id: "dev1" }] });
-    const res = await request(app).get("/api/latest/dev1").set("x-user-id", "1");
+    const res = await request(app).get("/api/latest/dev1").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(1);
   });
@@ -1246,7 +1337,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [adminRow] })
       .mockResolvedValueOnce({ rows: [{ id: 1, device_id: "dev1" }] });
-    const res = await request(app).get("/api/history/dev1").set("x-user-id", "1");
+    const res = await request(app).get("/api/history/dev1").set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
   });
@@ -1255,7 +1346,7 @@ describe("api endpoints", () => {
     queryMock
       .mockResolvedValueOnce({ rows: [userRow] })
       .mockResolvedValueOnce({ rowCount: 0, rows: [] });
-    const res = await request(app).get("/api/history/dev1").set("x-user-id", "2");
+    const res = await request(app).get("/api/history/dev1").set(await authHeaderFor(userRow));
     expect(res.status).toBe(403);
   });
 
@@ -1278,7 +1369,7 @@ describe("api endpoints", () => {
     const res = await request(app)
       .get("/api/readings")
       .query({ search: "device:dev1" })
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(2);
     expect(res.body.pagination.total).toBe(2);
@@ -1290,7 +1381,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rowCount: 0, rows: [] });
     const res = await request(app)
       .get("/api/readings?device=other-device")
-      .set("x-user-id", "2");
+      .set(await authHeaderFor(userRow));
     expect(res.status).toBe(403);
   });
 
@@ -1304,7 +1395,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .get("/api/readings?search=ts:afternoon")
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
   });
 
@@ -1318,7 +1409,7 @@ describe("api endpoints", () => {
       .mockResolvedValueOnce({ rows: [{ temperature_c: 25 }] });
     const res = await request(app)
       .get("/api/readings?search=t:25")
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
   });
 
@@ -1333,7 +1424,7 @@ describe("api endpoints", () => {
         expect(sql).toContain("device_id IN");
         return Promise.resolve({ rows: [{ id: 1 }] });
       });
-    const res = await request(app).get("/api/readings").set("x-user-id", "2");
+    const res = await request(app).get("/api/readings").set(await authHeaderFor(userRow));
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
   });
@@ -1353,7 +1444,7 @@ describe("api endpoints", () => {
     const res = await request(app)
       .get("/api/readings")
       .query({ device: "dev1" })
-      .set("x-user-id", "2");
+      .set(await authHeaderFor(userRow));
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
   });
@@ -1369,7 +1460,7 @@ describe("api endpoints", () => {
     const res = await request(app)
       .get("/api/readings")
       .query({ search: "ts:2024-01-15" })
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
   });
 
@@ -1385,7 +1476,7 @@ describe("api endpoints", () => {
     const res = await request(app)
       .get("/api/readings")
       .query({ search: "t:20-30" })
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
   });
 
@@ -1400,7 +1491,7 @@ describe("api endpoints", () => {
     const res = await request(app)
       .get("/api/readings")
       .query({ search: "t:>25" })
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
   });
 
@@ -1415,7 +1506,7 @@ describe("api endpoints", () => {
     const res = await request(app)
       .get("/api/readings")
       .query({ search: "dev1" })
-      .set("x-user-id", "1");
+      .set(await authHeaderFor(adminRow));
     expect(res.status).toBe(200);
   });
 });

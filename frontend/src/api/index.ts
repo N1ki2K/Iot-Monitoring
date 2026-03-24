@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import type {
   Reading,
   PaginatedResponse,
@@ -21,24 +22,32 @@ const client = axios.create({
   timeout: 10000,
 });
 
-const getStoredUserId = () => {
+const getStoredAuthUser = () => {
   if (typeof window === 'undefined') return null;
   const stored = localStorage.getItem('authUser');
   if (!stored) return null;
   try {
-    const parsed = JSON.parse(stored) as AuthUser;
-    return parsed.id ?? null;
+    return JSON.parse(stored) as AuthUser;
   } catch {
     return null;
   }
 };
 
-client.interceptors.request.use((config) => {
-  const userId = getStoredUserId();
-  if (userId) {
+const storeAuthUser = (user: AuthUser | null) => {
+  if (typeof window === 'undefined') return;
+  if (user) {
+    localStorage.setItem('authUser', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('authUser');
+  }
+};
+
+client.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const authUser = getStoredAuthUser();
+  if (authUser?.token) {
     config.headers = config.headers ?? {};
-    if (!config.headers['x-user-id']) {
-      config.headers['x-user-id'] = userId;
+    if (!config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${authUser.token}`;
     }
   }
   config.headers = config.headers ?? {};
@@ -47,6 +56,50 @@ client.interceptors.request.use((config) => {
   }
   return config;
 });
+
+type RetryableConfig = AxiosRequestConfig & { _retry?: boolean };
+
+client.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalConfig = error.config as RetryableConfig | undefined;
+    const status = error.response?.status as number | undefined;
+    const authUser = getStoredAuthUser();
+
+    if (
+      status !== 401 ||
+      !originalConfig ||
+      originalConfig._retry ||
+      originalConfig.url?.includes('/auth/login') ||
+      originalConfig.url?.includes('/auth/register') ||
+      originalConfig.url?.includes('/auth/refresh') ||
+      !authUser?.refreshToken
+    ) {
+      return Promise.reject(error);
+    }
+
+    originalConfig._retry = true;
+
+    try {
+      const { data } = await client.post<AuthUser>('/auth/refresh', {
+        refreshToken: authUser.refreshToken,
+      });
+      const refreshedUser = {
+        ...authUser,
+        ...data,
+        token: data.token ?? authUser.token,
+        refreshToken: data.refreshToken ?? authUser.refreshToken,
+      };
+      storeAuthUser(refreshedUser);
+      originalConfig.headers = originalConfig.headers ?? {};
+      originalConfig.headers.Authorization = `Bearer ${refreshedUser.token}`;
+      return await client(originalConfig);
+    } catch (refreshError) {
+      storeAuthUser(null);
+      return Promise.reject(refreshError);
+    }
+  }
+);
 
 export const api = {
   // Get all devices
@@ -105,6 +158,15 @@ export const api = {
     return data;
   },
 
+  refreshAuth: async (refreshToken: string): Promise<AuthUser> => {
+    const { data } = await client.post<AuthUser>('/auth/refresh', { refreshToken });
+    return data;
+  },
+
+  logout: async (refreshToken: string) => {
+    await client.post('/auth/logout', { refreshToken });
+  },
+
   getUsers: async (): Promise<UserListItem[]> => {
     const { data } = await client.get<UserListItem[]>('/users');
     return data;
@@ -138,11 +200,7 @@ export const api = {
   },
 
   getUserControllers: async (userId: number): Promise<UserControllerAssignment[]> => {
-    const { data } = await client.get<UserControllerAssignment[]>(`/users/${userId}/controllers`, {
-      headers: {
-        'x-user-id': userId,
-      },
-    });
+    const { data } = await client.get<UserControllerAssignment[]>(`/users/${userId}/controllers`);
     return data;
   },
 

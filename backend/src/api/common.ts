@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import type express from "express";
+import { JWTPayload, SignJWT, errors, jwtVerify } from "jose";
 import { Pool } from "pg";
 
 export const USER_PUBLIC_COLUMNS =
@@ -37,6 +38,58 @@ export const requestMetricsMiddleware: express.RequestHandler = (req, res, next)
   });
   next();
 };
+
+type AccessTokenPayload = JWTPayload & {
+  sub: string;
+  email: string;
+  role?: string;
+  is_admin: number;
+};
+
+type AuthUserLike = {
+  id: number;
+  email: string;
+  username: string;
+  role?: string;
+  is_admin: unknown;
+  invited_by?: number | null;
+  invited_at?: string | null;
+  must_change_password: unknown;
+  created_at: string;
+};
+
+export const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET?.trim();
+  if (!secret) {
+    throw new Error("JWT_SECRET is required");
+  }
+  return secret;
+};
+
+const getJwtExpirySeconds = () => {
+  const parsed = Number(process.env.JWT_EXPIRES_IN_SECONDS ?? 3600);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 3600;
+};
+
+const getRefreshExpirySeconds = () => {
+  const parsed = Number(process.env.JWT_REFRESH_EXPIRES_IN_SECONDS ?? 1209600);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1209600;
+};
+
+const getJwtSecretBytes = () => new TextEncoder().encode(getJwtSecret());
+
+type AuthFailureReason = "missing" | "invalid" | "expired";
+
+type RequestAuthContext = {
+  failureReason?: AuthFailureReason;
+  tokenPayload?: AccessTokenPayload;
+};
+
+declare module "express-serve-static-core" {
+  interface Request {
+    auth?: RequestAuthContext;
+  }
+}
 
 export const normalizeFlag = (value: unknown) =>
   value === true || value === 1 || value === "1";
@@ -100,8 +153,142 @@ export const extractPairingCode = (raw: unknown): string | null => {
   return match ? match[1] : null;
 };
 
+export const createAccessToken = async (user: {
+  id: number;
+  email: string;
+  role?: string;
+  is_admin?: number;
+}) => {
+  const payload: AccessTokenPayload = {
+    sub: String(user.id),
+    email: user.email,
+    role: user.role,
+    is_admin: user.is_admin ?? 0,
+  };
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuedAt()
+    .setExpirationTime(`${getJwtExpirySeconds()}s`)
+    .sign(getJwtSecretBytes());
+};
+
+export const generateRefreshToken = () => crypto.randomBytes(48).toString("base64url");
+
+export const hashRefreshToken = (token: string) =>
+  crypto.createHash("sha256").update(token).digest("hex");
+
+export const createRefreshTokenSession = async (userId: number) => {
+  const refreshToken = generateRefreshToken();
+  const tokenHash = hashRefreshToken(refreshToken);
+  const expiresAt = new Date(Date.now() + getRefreshExpirySeconds() * 1000);
+
+  await pool.query(
+    `INSERT INTO refresh_tokens (token_hash, user_id, expires_at)
+     VALUES ($1, $2, $3)`,
+    [tokenHash, userId, expiresAt]
+  );
+
+  return { refreshToken, expiresAt };
+};
+
+export const revokeRefreshToken = async (refreshToken: string) => {
+  const tokenHash = hashRefreshToken(refreshToken);
+  await pool.query(
+    `UPDATE refresh_tokens
+     SET revoked_at = NOW()
+     WHERE token_hash = $1 AND revoked_at IS NULL`,
+    [tokenHash]
+  );
+};
+
+export const getUserByRefreshToken = async (refreshToken: string) => {
+  const tokenHash = hashRefreshToken(refreshToken);
+  const result = await pool.query(
+    `SELECT
+       u.${USER_PUBLIC_COLUMNS},
+       rt.token_hash,
+       rt.expires_at,
+       rt.revoked_at
+     FROM refresh_tokens rt
+     JOIN users u ON u.id = rt.user_id
+     WHERE rt.token_hash = $1`,
+    [tokenHash]
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  if (row.revoked_at) return null;
+  if (new Date(row.expires_at).getTime() <= Date.now()) return null;
+  return {
+    user: normalizeUserRow(row),
+    tokenHash,
+  };
+};
+
+export const rotateRefreshToken = async (refreshToken: string) => {
+  const session = await getUserByRefreshToken(refreshToken);
+  if (!session) return null;
+
+  await pool.query(
+    `UPDATE refresh_tokens
+     SET revoked_at = NOW()
+     WHERE token_hash = $1 AND revoked_at IS NULL`,
+    [session.tokenHash]
+  );
+
+  const nextSession = await createRefreshTokenSession(session.user.id);
+  return {
+    user: session.user,
+    refreshToken: nextSession.refreshToken,
+  };
+};
+
+export const verifyAccessToken = async (token: string): Promise<AccessTokenPayload> => {
+  const { payload, protectedHeader } = await jwtVerify(token, getJwtSecretBytes(), {
+    algorithms: ["HS256"],
+  });
+  if (protectedHeader.typ !== "JWT") {
+    throw new Error("Invalid token type");
+  }
+
+  const typedPayload = payload as AccessTokenPayload;
+  if (!typedPayload.sub || !typedPayload.email) {
+    throw new Error("Invalid token payload");
+  }
+
+  return typedPayload;
+};
+
+const resolveAuthContext = async (req: express.Request): Promise<RequestAuthContext> => {
+  const authHeader = req.header("authorization");
+  const tokenMatch = authHeader?.match(/^Bearer\s+(.+)$/i);
+  if (!authHeader) {
+    return { failureReason: "missing" };
+  }
+  if (!tokenMatch) {
+    return { failureReason: "invalid" };
+  }
+
+  try {
+    return {
+      tokenPayload: await verifyAccessToken(tokenMatch[1].trim()),
+    };
+  } catch (error) {
+    return {
+      failureReason: error instanceof errors.JWTExpired ? "expired" : "invalid",
+    };
+  }
+};
+
+export const authContextMiddleware: express.RequestHandler = async (req, _res, next) => {
+  req.auth = await resolveAuthContext(req);
+  next();
+};
+
 export const getRequester = async (req: express.Request) => {
-  const requesterId = Number(req.header("x-user-id"));
+  if (!req.auth) {
+    req.auth = await resolveAuthContext(req);
+  }
+  const requesterId = Number(req.auth?.tokenPayload?.sub);
   if (!requesterId) return null;
   const result = await pool.query(
     `SELECT ${USER_PUBLIC_COLUMNS}
@@ -117,6 +304,55 @@ export const getRequester = async (req: express.Request) => {
 export const ensureAdmin = (
   user: { role?: string; is_admin?: number } | null
 ) => Boolean(user && (user.role === "admin" || user.is_admin === 1));
+
+export const sendAuthError = (req: express.Request, res: express.Response) => {
+  const failureReason = req.auth?.failureReason ?? "invalid";
+  const message =
+    failureReason === "missing"
+      ? "missing bearer token"
+      : failureReason === "expired"
+        ? "expired bearer token"
+        : "invalid bearer token";
+  return res.status(401).json({ error: message });
+};
+
+export const requireRequester = async (req: express.Request, res: express.Response) => {
+  const requester = await getRequester(req);
+  if (requester) {
+    return requester;
+  }
+  sendAuthError(req, res);
+  return null;
+};
+
+export const requireAdminRequester = async (req: express.Request, res: express.Response) => {
+  const requester = await requireRequester(req, res);
+  if (!requester) {
+    return null;
+  }
+  if (!ensureAdmin(requester)) {
+    res.status(403).json({ error: "admin access required" });
+    return null;
+  }
+  return requester;
+};
+
+export const buildAuthResponse = async (user: AuthUserLike) => {
+  const normalizedUser = normalizeUserRow(user);
+  const safeUser = { ...normalizedUser } as typeof normalizedUser & {
+    password?: string;
+  };
+  delete safeUser.password;
+
+  const { refreshToken } = await createRefreshTokenSession(normalizedUser.id);
+  return {
+    ...safeUser,
+    invited_by: user.invited_by ?? null,
+    invited_at: user.invited_at ?? null,
+    token: await createAccessToken(normalizedUser),
+    refreshToken,
+  };
+};
 
 export const generatePairingCode = async () => {
   for (let attempt = 0; attempt < 10; attempt++) {

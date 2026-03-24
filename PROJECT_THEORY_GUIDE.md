@@ -98,7 +98,9 @@ Iot-Monitoring/
 │   │   ├── 006_add_sound_dbfs.sql
 │   │   ├── 007_add_sound_est_spl.sql
 │   │   ├── 008_add_air_baseline_pct.sql
-│   │   └── 009_rename_co2_ppm_to_air_quality_raw.sql
+│   │   ├── 009_rename_co2_ppm_to_air_quality_raw.sql
+│   │   ├── 010_drop_legacy_user_flag.sql
+│   │   └── 011_create_refresh_tokens.sql
 │   └── src/
 │       ├── api.ts
 │       ├── ingest.ts
@@ -459,6 +461,8 @@ Responsible for:
 - connecting to the MQTT broker
 - subscribing to the configured topic
 - parsing payloads
+- extracting the `device_id` from the MQTT topic path
+- mapping payload fields to the current telemetry schema
 - inserting readings into the `readings` table
 
 ### 8.3 User management module
@@ -467,6 +471,9 @@ Supports:
 
 - registration
 - login
+- access-token issuance with JWT
+- refresh-token rotation
+- logout with refresh-token revocation
 - profile retrieval
 - profile update
 - password change
@@ -756,12 +763,30 @@ Purpose:
 - operational accountability
 - admin reporting
 
+#### `refresh_tokens`
+
+Stores hashed refresh-token sessions. Important fields include:
+
+- `token_hash`
+- `user_id`
+- `expires_at`
+- `revoked_at`
+- `created_at`
+
+Purpose:
+
+- persistent refresh-session tracking
+- logout revocation
+- refresh-token rotation
+- expiration control for long-lived sessions
+
 ### 10.2 Relationship explanation
 
 - one user can have many controller assignments
 - one controller can be assigned to many users
 - one controller/device can produce many readings
 - one user can generate many audit log entries
+- one user can have many refresh-token sessions over time
 
 ### 10.3 Why a relational model fits
 
@@ -782,6 +807,8 @@ The backend is organized into route modules:
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
 
 ### 11.2 Profile endpoints
 
@@ -821,28 +848,36 @@ The backend is organized into route modules:
 
 ### 11.6 Audit and health endpoints
 
+- `GET /api/health`
 - `GET /api/audit`
 - `DELETE /api/audit`
 - `GET /api/admin/health`
 
 ## 12. Authorization Model
 
-The current project does not use JWT or session-based authentication. Instead, the clients identify the current user through the request header:
+The current backend uses JWT-based bearer authentication for API access together with database-backed refresh tokens for session continuation.
 
-`x-user-id`
+The authentication flow works as follows:
 
-The backend resolves the requester from the database and applies role checks.
+- `POST /api/auth/register` and `POST /api/auth/login` return a signed access token and an opaque refresh token
+- the access token is sent through the `Authorization: Bearer <token>` header
+- the backend validates the JWT and resolves the requester from the `users` table
+- `POST /api/auth/refresh` rotates the refresh token and issues a new access token
+- `POST /api/auth/logout` revokes the submitted refresh token
+
+The refresh token itself is not stored in plaintext. The backend hashes it with SHA-256 and stores the hash in the `refresh_tokens` table together with expiration and revocation metadata.
 
 ### Current authorization rules
 
 - unauthenticated users can register and log in
-- authenticated standard users can manage their own profile
-- standard users can access only their assigned devices
+- authenticated standard users can manage their own profile and password
+- standard users can access only their assigned devices and assignments
 - administrators can access system-wide user, controller, audit, and health features
+- route handlers still apply database-level ownership checks in addition to token validation
 
 ### Important theory note
 
-When documenting the system, describe this as a simplified authentication/authorization approach suitable for a prototype, coursework project, or controlled environment. It should not be presented as a production-grade identity mechanism.
+When documenting the system, it is accurate to describe the design as a practical stateless API authentication model suitable for coursework and small deployments. It is stronger than the earlier header-based prototype approach because it uses signed bearer tokens, revocable refresh sessions, password hashing, and route-level role checks. At the same time, it should still not be presented as a fully hardened production identity platform because the project does not yet include features such as rate limiting, MFA, centralized key rotation, or full input-validation coverage.
 
 ## 13. Search and Data Query Logic
 
@@ -917,7 +952,7 @@ The Android app provides:
 
 The app sends:
 
-- `x-user-id`
+- `Authorization: Bearer <token>`
 - `x-client: mobile`
 
 The mobile client expands system usability beyond the desktop browser and supports quick status access through a home-screen widget.
@@ -994,14 +1029,16 @@ Supported by:
 Supported by:
 
 - password hashing with `scrypt`
+- signed JWT access tokens
+- refresh-token hashing, rotation, and revocation
 - admin role checks
 - audit trail for sensitive actions
 
 But limited by:
 
-- header-based identity instead of token-based auth
 - no explicit TLS handling in local development
 - development-friendly defaults
+- no rate limiting or brute-force protection layer
 
 ### 19.5 Reliability
 
@@ -1016,20 +1053,24 @@ Supported by:
 
 The backend hashes passwords using `scrypt`, which is a strong password hashing approach for stored credentials. This is a real design strength and should be mentioned explicitly.
 
-At the same time, the current authentication transport model is simplified. If writing a formal theory or thesis, present this honestly:
+The backend now uses signed JWT access tokens together with opaque refresh tokens stored as SHA-256 hashes in PostgreSQL. This gives the system a practical stateless authentication model while still allowing session rotation and logout revocation.
+
+If writing a formal theory or thesis, present the current security design honestly:
 
 - password storage is handled responsibly
+- access tokens are signed and validated server-side
+- refresh sessions are persisted, rotated, and revocable
 - authorization logic exists
 - auditing exists
-- identity propagation is simplified for development and should be upgraded for production
+- the implementation is solid for a student or prototype system but still not fully production-hardened
 
 Recommended future security improvements:
 
-- JWT or session-based authentication
-- refresh tokens or secure cookie sessions
 - HTTPS everywhere
+- secure cookie transport where appropriate
 - stronger request validation
 - rate limiting
+- refresh-token reuse detection and session device metadata
 - role/permission abstraction beyond `is_admin`
 
 ## 21. Testing Strategy
@@ -1052,7 +1093,6 @@ If needed in a document, you can describe the current state as partial automated
 
 This section is important in a serious project theory.
 
-- authentication is simplified and not production-grade
 - the MQTT topic configuration appears centered on a single default topic pattern in local setup
 - sensor data is largely raw and not deeply calibrated
 - no advanced alerting pipeline is described in the backend
@@ -1060,10 +1100,10 @@ This section is important in a serious project theory.
 - no full end-to-end test suite across device, backend, and clients
 - no explicit offline synchronization strategy for mobile clients
 - no message retention, dead-letter handling, or broker-side QoS strategy is documented
+- authentication is improved but still not fully production-grade because there is no MFA, rate limiting, or HTTPS-first deployment model in the repository
 
 ## 23. Possible Future Improvements
 
-- replace header-based identity with JWT or secure sessions
 - support multiple device topic subscriptions dynamically
 - add calibrated sensor interpretation and threshold alerting
 - add notifications for abnormal readings
@@ -1072,6 +1112,8 @@ This section is important in a serious project theory.
 - separate ingest and API services more formally for scaling
 - add end-to-end integration tests
 - support analytics, anomaly detection, or forecasting
+- add MFA, rate limiting, and stronger session management controls
+- move refresh tokens to secure cookie flows for browser clients if desired
 
 ## 24. Suggested Theory Chapter Structure
 
@@ -1190,12 +1232,13 @@ Depending on the academic framing, this project can be presented as:
 When writing the theory, keep these details aligned with the current codebase:
 
 - the backend is Express-based and written in TypeScript
+- the backend runtime is split into a REST API and a separate MQTT ingest worker
 - the frontend uses React 19 and Vite
 - the mobile app is native Android in Kotlin
 - the database is PostgreSQL
 - the message broker is Mosquitto over MQTT
 - password hashing uses `scrypt`
-- current identity propagation uses `x-user-id`, not JWT
+- API authentication uses JWT bearer tokens plus database-backed refresh tokens
 - controllers are claimable through a generated 5-digit pairing code
 - audit logging and admin health endpoints are implemented
 

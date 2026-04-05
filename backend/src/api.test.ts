@@ -155,9 +155,13 @@ describe("api endpoints", () => {
 
   it("authContextMiddleware marks tampered bearer token", async () => {
     const token = await createAccessToken(adminRow);
+    const [header, payload, signature] = token.split(".");
+    const tamperedSignature = `${signature[0] === "a" ? "b" : "a"}${signature.slice(1)}`;
     const req = {
       header: (name: string) =>
-        name === "authorization" ? `Bearer ${token.slice(0, -1)}x` : undefined,
+        name === "authorization"
+          ? `Bearer ${[header, payload, tamperedSignature].join(".")}`
+          : undefined,
     } as unknown as Request;
     await authContextMiddleware(req, {} as Response, () => undefined);
     expect(req.auth?.failureReason).toBe("invalid");

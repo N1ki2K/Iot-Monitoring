@@ -87,6 +87,8 @@ CREATE INDEX idx_audit_logs_entity_type ON audit_logs (entity_type);
 CREATE INDEX idx_audit_logs_entity_id ON audit_logs (entity_id);
 ```
 
+After creating the base tables, run the SQL migrations as well. The current authentication flow requires schema added in later migrations, including the `refresh_tokens` table used during login and registration.
+
 ### Schema Overview
 
 | Table | Description |
@@ -96,6 +98,7 @@ CREATE INDEX idx_audit_logs_entity_id ON audit_logs (entity_id);
 | `controllers` | Registered IoT controllers |
 | `user_controllers` | User-to-controller assignments |
 | `audit_logs` | Admin action audit trail |
+| `refresh_tokens` | Hashed refresh-token sessions for auth |
 
 ### Apply SQL Migrations
 

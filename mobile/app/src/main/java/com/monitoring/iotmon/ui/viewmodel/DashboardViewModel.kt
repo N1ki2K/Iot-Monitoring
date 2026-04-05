@@ -10,6 +10,7 @@ import com.monitoring.iotmon.data.repository.IoTRepository
 import com.monitoring.iotmon.data.repository.Result
 import com.monitoring.iotmon.util.getDisplayedSound
 import com.monitoring.iotmon.util.NotificationHelper
+import com.monitoring.iotmon.widget.SensorWidgetProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,6 +77,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         isLoading = false
                     )
 
+                    selectedDevice?.let {
+                        SensorWidgetProvider.setSelectedDeviceId(getApplication(), it)
+                        SensorWidgetProvider.updateAllWidgets(getApplication())
+                    }
+
                     // Load data for selected device
                     selectedDevice?.let { loadDeviceData(it) }
 
@@ -98,6 +104,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             selectedDevice = deviceId,
             selectedDevicePairingCode = pairingCode
         )
+        SensorWidgetProvider.setSelectedDeviceId(getApplication(), deviceId)
+        SensorWidgetProvider.updateAllWidgets(getApplication())
         loadDeviceData(deviceId)
     }
 
@@ -127,6 +135,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         deviceStatus = status,
                         lastSeen = lastSeen
                     )
+
+                    SensorWidgetProvider.updateAllWidgets(getApplication())
 
                     // Check thresholds and send notifications
                     if (reading != null) {

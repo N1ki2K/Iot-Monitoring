@@ -12,9 +12,12 @@ import android.widget.RemoteViews
 import com.monitoring.iotmon.MainActivity
 import com.monitoring.iotmon.R
 import com.monitoring.iotmon.data.api.ApiClient
+import com.monitoring.iotmon.data.preferences.UserPreferences
 import com.monitoring.iotmon.data.repository.IoTRepository
 import com.monitoring.iotmon.data.repository.Result
 import com.monitoring.iotmon.util.getDisplayedSound
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -201,6 +204,7 @@ class SensorWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
+        restoreSession(context)
         val repository = IoTRepository()
 
         try {
@@ -292,6 +296,15 @@ class SensorWidgetProvider : AppWidgetProvider() {
             thread.start()
         } catch (e: Exception) {
             updateWithError(context, appWidgetManager, appWidgetIds, "Error")
+        }
+    }
+
+    private fun restoreSession(context: Context) {
+        runBlocking {
+            val user = UserPreferences(context).userFlow.first()
+            ApiClient.setUserId(user?.id)
+            ApiClient.setAuthToken(user?.token)
+            ApiClient.setRefreshToken(user?.refreshToken)
         }
     }
 

@@ -91,14 +91,14 @@ export const DataTable = memo(function DataTable({ selectedDevice }: DataTablePr
           <h3 className="text-lg font-semibold text-gray-200">{t('dataTable.title')}</h3>
 
           {/* Search */}
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <div className="relative w-full sm:w-72">
+            <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <input
               type="text"
               placeholder={t('dataTable.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="input pl-10"
+              className="input h-11 pl-12 pr-4"
             />
           </div>
         </div>

@@ -19,7 +19,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 export function Auth({ onAuth }: AuthProps) {
-  const { t } = useI18n();
+  const { language, setLanguage, t } = useI18n();
   const [mode, setMode] = useState<AuthMode>('login');
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
@@ -120,34 +120,50 @@ export function Auth({ onAuth }: AuthProps) {
           </div>
 
           <div className="rounded-2xl border border-slate-800/80 bg-slate-900/70 backdrop-blur px-8 py-10">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-semibold text-white">
-                  {mode === 'login' ? t('auth.welcomeBack') : t('auth.createAccount')}
-                </h2>
-                <p className="text-sm text-gray-400 mt-2">
-                  {mode === 'login'
-                    ? t('auth.loginPrompt')
-                    : t('auth.registerPrompt')}
-                </p>
+            <div className="space-y-6">
+              <div className="flex justify-end">
+                <label className="flex items-center gap-3 text-sm text-gray-300">
+                  <span>{t('common.language')}</span>
+                  <select
+                    className="rounded-full border border-slate-700 bg-slate-950/80 px-3 py-1.5 text-sm text-white outline-none transition focus:border-cyan-400"
+                    value={language}
+                    onChange={(event) => setLanguage(event.target.value as 'en' | 'bg')}
+                  >
+                    <option value="en">{t('language.english')}</option>
+                    <option value="bg">{t('language.bulgarian')}</option>
+                  </select>
+                </label>
               </div>
-              <div className="flex items-center rounded-full bg-slate-800/70 p-1 text-xs">
-                <button
-                  className={`px-3 py-1.5 rounded-full font-semibold ${
-                    mode === 'login' ? 'bg-cyan-500 text-white' : 'text-gray-400'
-                  }`}
-                  onClick={() => handleModeChange('login')}
-                >
-                  {t('auth.login')}
-                </button>
-                <button
-                  className={`px-3 py-1.5 rounded-full font-semibold ${
-                    mode === 'register' ? 'bg-cyan-500 text-white' : 'text-gray-400'
-                  }`}
-                  onClick={() => handleModeChange('register')}
-                >
-                  {t('auth.register')}
-                </button>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-semibold text-white">
+                    {mode === 'login' ? t('auth.welcomeBack') : t('auth.createAccount')}
+                  </h2>
+                  <p className="text-sm text-gray-400 mt-2">
+                    {mode === 'login'
+                      ? t('auth.loginPrompt')
+                      : t('auth.registerPrompt')}
+                  </p>
+                </div>
+                <div className="flex items-center rounded-full bg-slate-800/70 p-1 text-xs">
+                  <button
+                    className={`px-3 py-1.5 rounded-full font-semibold ${
+                      mode === 'login' ? 'bg-cyan-500 text-white' : 'text-gray-400'
+                    }`}
+                    onClick={() => handleModeChange('login')}
+                  >
+                    {t('auth.login')}
+                  </button>
+                  <button
+                    className={`px-3 py-1.5 rounded-full font-semibold ${
+                      mode === 'register' ? 'bg-cyan-500 text-white' : 'text-gray-400'
+                    }`}
+                    onClick={() => handleModeChange('register')}
+                  >
+                    {t('auth.register')}
+                  </button>
+                </div>
               </div>
             </div>
 

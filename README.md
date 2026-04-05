@@ -41,7 +41,8 @@ Iot-Monitoring/
 │   │   ├── 007_add_sound_est_spl.sql
 │   │   ├── 008_add_air_baseline_pct.sql
 │   │   ├── 009_rename_co2_ppm_to_air_quality_raw.sql
-│   │   └── 010_drop_legacy_user_flag.sql
+│   │   ├── 010_drop_legacy_user_flag.sql
+│   │   └── 011_create_refresh_tokens.sql
 │   └── src/
 │       ├── api.ts
 │       ├── api.test.ts
@@ -303,6 +304,16 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs (action);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_type ON audit_logs (entity_type);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_id ON audit_logs (entity_id);
 ```
+
+### 5. Apply backend migrations
+
+Run the SQL migrations even if you created the base tables manually:
+
+```bash
+npm run migrate -w backend
+```
+
+This adds schema required by the current auth flow, including the `refresh_tokens` table used by login and registration.
 
 Example `psql` session:
 

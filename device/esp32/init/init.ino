@@ -30,7 +30,7 @@
 
 //#define MQTT_HOST                 "192.168.88.90" //arch
 //#define MQTT_HOST                 "192.168.88.77" //mach
-#define MQTT_HOST                 "192.168.181.86" //mobile
+#define MQTT_HOST                 "10.116.196.86" //mobile
 #define MQTT_PORT                 1883
 
 // MQTT topics

@@ -30,7 +30,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Read API URL from .env
-        val apiUrl = envProperties.getProperty("MOBILE_API_URL") ?: "http://192.168.181.86:3000/api/"
+        val apiUrl = envProperties.getProperty("MOBILE_API_URL") ?: "http://10.116.196.86/api/"
         buildConfigField("String", "API_BASE_URL", "\"$apiUrl\"")
     }
 
